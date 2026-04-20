@@ -26,6 +26,15 @@ This project is an audio-first fork concept inspired by `browser-use/video-use`,
 - Renders vertical reels with subtitles and generated visuals
 - Produces packaging artifacts for show notes, timestamps, and YouTube description
 
+## Current limitations
+
+- Groq Whisper does not provide true speaker diarization in this workflow.
+- Two-person or multi-person conversations can still be transcribed and edited by content.
+- Speaker labels are not reliable enough to present as ground truth.
+- Do not assume the skill can safely output formal `Speaker A / Speaker B` attribution without human review.
+- For interviews or conversations with multiple speakers, use this skill for transcript-driven editing, not authoritative speaker labeling.
+- If you need publication-grade speaker attribution, plan for manual review.
+
 ## Prerequisites
 
 You need:

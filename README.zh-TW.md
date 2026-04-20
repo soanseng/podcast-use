@@ -18,6 +18,15 @@
 - 產出 reels
 - 產出 `show_notes.md`、`timestamps.txt`、`youtube_description.md`
 
+## 目前限制
+
+- 目前這條 `Groq Whisper` workflow 不提供真正的 speaker diarization。
+- 雙人或多人對話仍然可以轉錄，也可以做內容剪輯。
+- 但講者標示不夠可靠，不能當成正式真值。
+- 不應把這個 skill 產出的 `Speaker A / Speaker B` 類型標示當成可直接發佈的正式 attribution。
+- 如果是訪談或多人對話，這個 skill 適合拿來做 transcript-driven editing，不適合拿來做權威講者標記。
+- 如果你需要正式可發佈等級的講者 attribution，請人工複核。
+
 ## 前置安裝
 
 需要先有：

@@ -37,6 +37,7 @@ Do not introduce video-specific logic. This skill is for podcasts, interviews, m
 14. Before generating any image, explicitly ask whether the user wants text baked into the image. Do not assume they want text on the image.
 15. Before generating any cover or reel image, explicitly ask for the desired visual style. If the user has no preference, propose 2 to 3 style directions based on the episode topic and ask them to choose.
 16. When the user is preparing to publish, default to offering the full publishing package: long-form YouTube video, reels, `show_notes.md`, `timestamps.txt`, and `youtube_description.md`.
+17. For two-person or multi-person conversations, default to content editing and transcript packaging, not authoritative speaker attribution. Do not present speaker labels as reliable ground truth unless the user explicitly accepts manual review.
 
 ## Required Tools
 
@@ -75,6 +76,7 @@ source_dir/
 - Check audio duration with `ffprobe`
 - Identify whether the material is single-speaker or multi-speaker
 - Ask the user what kind of edit they want
+- If the material is multi-speaker, warn that this workflow does not provide true diarization and that speaker attribution should be treated as provisional at best
 
 ### 2. Transcribe
 
@@ -325,6 +327,7 @@ Rules:
 - `youtube_description.md` should start with a clean hook and episode summary, then timestamps, then links or placeholders
 - `show_notes.md` should be more detailed than the YouTube description
 - If links, sponsors, or CTAs are unknown, leave clear placeholders rather than inventing them
+- For multi-speaker episodes, avoid fabricating confident speaker labels in show notes or descriptions
 
 ### 11. Publishing Package
 
@@ -356,6 +359,7 @@ Recommended order:
 - For clip extraction, optimize for a complete thought and a clean ending
 - If the user wants publication-ready output, recommend a separate mastering pass after structural editing
 - For YouTube uploads, recommend checking subtitle readability and cover-image legibility before publishing
+- For multi-speaker conversations, optimize for content clarity, not false precision around who said each line
 
 ## Metadata Writing Guidance
 
