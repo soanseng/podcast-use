@@ -8,6 +8,8 @@
 
 [繁體中文 README](README.zh-TW.md)
 
+License: [MIT](LICENSE)
+
 Conversation-driven podcast editing skill for Claude Code.
 
 This project is an audio-first fork concept inspired by `browser-use/video-use`, adapted for podcast and spoken-word editing workflows.

@@ -4,6 +4,8 @@
 
 [English README](README.md)
 
+授權： [MIT](LICENSE)
+
 ## 相關專案
 
 如果你對這類結合內容、思考、自我理解的工具有興趣，也可以看看 [AnatoMee](https://anatomee.app/)。
