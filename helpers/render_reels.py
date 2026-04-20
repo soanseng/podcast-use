@@ -92,6 +92,8 @@ def render_reel_video(
     output_path: Path,
     title: str,
     intro: str,
+    preset: str,
+    fps: int,
 ) -> None:
     filter_parts = [
         "scale=1080:1920:force_original_aspect_ratio=increase",
@@ -117,6 +119,8 @@ def render_reel_video(
             "-y",
             "-loop",
             "1",
+            "-framerate",
+            str(max(1, fps)),
             "-i",
             str(image_path),
             "-i",
@@ -125,6 +129,8 @@ def render_reel_video(
             ",".join(filter_parts),
             "-c:v",
             "libx264",
+            "-preset",
+            preset,
             "-tune",
             "stillimage",
             "-c:a",
@@ -165,6 +171,17 @@ def main() -> None:
         help="Fallback Gemini image model",
     )
     parser.add_argument("--max-words", type=int, default=6, help="Max words per subtitle cue")
+    parser.add_argument(
+        "--preset",
+        default="veryfast",
+        help="ffmpeg x264 preset for reel rendering",
+    )
+    parser.add_argument(
+        "--fps",
+        type=int,
+        default=1,
+        help="Output frame rate for static-image reels. Defaults to 1 fps",
+    )
     args = parser.parse_args()
 
     edit_dir = args.edit_dir.resolve()
@@ -233,6 +250,8 @@ def main() -> None:
             output_path=reel_output,
             title=reel.get("title", "").strip(),
             intro=reel.get("intro", "").strip(),
+            preset=args.preset,
+            fps=args.fps,
         )
         print(f"rendered reel: {reel_output}")
 
