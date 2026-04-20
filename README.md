@@ -1,5 +1,13 @@
 # podcast-use
 
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB.svg)](https://www.python.org/)
+[![uv](https://img.shields.io/badge/package%20manager-uv-5C5CFF.svg)](https://github.com/astral-sh/uv)
+[![ffmpeg](https://img.shields.io/badge/audio-ffmpeg-007808.svg)](https://ffmpeg.org/)
+[![Groq Whisper](https://img.shields.io/badge/STT-Groq%20Whisper-F55036.svg)](https://console.groq.com/docs/speech-to-text)
+[![Gemini Image](https://img.shields.io/badge/images-Gemini-4285F4.svg)](https://ai.google.dev/gemini-api/docs/image-generation)
+
+[繁體中文 README](README.zh-TW.md)
+
 Conversation-driven podcast editing skill for Claude Code.
 
 This project is an audio-first fork concept inspired by `browser-use/video-use`, adapted for podcast and spoken-word editing workflows.
@@ -39,10 +47,46 @@ cp .env.example .env
 $EDITOR .env
 ```
 
-## Claude Code skill install
+## Install as a skill
+
+Paste one of these into your client shell after cloning the repo.
+
+Claude Code:
+
+```bash
+./scripts/install_skill.sh claude
+```
+
+Codex:
+
+```bash
+./scripts/install_skill.sh codex
+```
+
+If you want the full clone-and-install flow in one paste:
+
+Claude Code:
+
+```bash
+git clone https://github.com/soanseng/podcast-use.git && cd podcast-use && ./scripts/install_skill.sh claude
+```
+
+Codex:
+
+```bash
+git clone https://github.com/soanseng/podcast-use.git && cd podcast-use && ./scripts/install_skill.sh codex
+```
+
+Manual Claude Code install:
 
 ```bash
 ln -s "$(pwd)" ~/.claude/skills/podcast-use
+```
+
+Manual Codex install:
+
+```bash
+ln -s "$(pwd)" "${CODEX_HOME:-$HOME/.codex}/skills/podcast-use"
 ```
 
 ## Typical workflow
@@ -77,17 +121,37 @@ uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit
 Default spoken-word processing during render:
 
 - broadband denoise
+- speech leveling before compression
 - high-pass filter at `80Hz`
 - low-pass filter at `13.5kHz`
+- spoken-word equalizer shaping
 - light compression
 - `loudnorm` targeting podcast-style delivery
+- light post-processing denoise
+- final limiter for peak control
+
+This is intended to approximate a practical Audacity-style speech chain:
+
+- denoise
+- normalize
+- equalizer
+- compress
+- normalize
+- denoise
+- limiter
+
+It is not a bit-for-bit match for Audacity effects, but the processing intent is close and is tuned for spoken-word delivery.
 
 Disable pieces when needed:
 
 ```bash
 uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-denoise
+uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-leveler
+uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-eq
 uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-compressor
 uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-normalize
+uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-post-denoise
+uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-limiter
 ```
 
 Build subtitles:

@@ -161,10 +161,24 @@ This renders `edit/final.mp3` by default.
 Default render processing is tuned for spoken-word audio:
 
 - broadband denoise
+- speech leveling before compression
 - high-pass filtering for low rumble
 - low-pass filtering for hiss control
+- spoken-word equalizer shaping
 - light compression for level consistency
 - loudness normalization for podcast playback
+- a light post-processing denoise pass
+- final limiting for peak safety
+
+This chain is meant to approximate the practical intent of an Audacity-style flow such as:
+
+- noise reduction
+- normalize
+- equalizer
+- compress
+- normalize
+- noise reduction
+- limiter
 
 If the source is already mastered, disable filters selectively rather than stacking unnecessary processing.
 

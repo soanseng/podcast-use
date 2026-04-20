@@ -15,10 +15,14 @@ def run(cmd: list[str]) -> None:
 def build_podcast_filter_chain(
     *,
     denoise: bool,
+    post_denoise: bool,
+    leveler: bool,
     highpass_hz: int,
     lowpass_hz: int,
+    equalizer: bool,
     compressor: bool,
     normalize: bool,
+    limiter: bool,
 ) -> list[str]:
     filters: list[str] = []
 
@@ -26,17 +30,37 @@ def build_podcast_filter_chain(
         # Conservative broadband denoise for spoken-word recordings.
         filters.append("afftdn=nr=10:nf=-25:tn=1")
 
+    if leveler:
+        # Pre-compression speech leveling to approximate a first normalize pass.
+        filters.append("speechnorm=e=4.5:r=0.00008:l=1")
+
     if highpass_hz > 0:
         filters.append(f"highpass=f={highpass_hz}")
 
     if lowpass_hz > 0:
         filters.append(f"lowpass=f={lowpass_hz}")
 
+    if equalizer:
+        # Mild spoken-word EQ: trim sub-bass mud, add presence, tame top-end.
+        filters.append(
+            "firequalizer="
+            "gain_entry='entry(0,-6);entry(70,-5);entry(120,-2);"
+            "entry(250,-1.2);entry(3000,1.8);entry(4500,1.4);"
+            "entry(7000,0.6);entry(13500,-3.5)'"
+        )
+
     if compressor:
         filters.append("acompressor=threshold=0.089:ratio=3:attack=20:release=250:makeup=2")
 
     if normalize:
         filters.append("loudnorm=I=-16:LRA=7:TP=-1.5")
+
+    if post_denoise:
+        # Light second cleanup pass after dynamics processing.
+        filters.append("afftdn=nr=4:nf=-30:tn=1")
+
+    if limiter:
+        filters.append("alimiter=limit=0.95:level=disabled")
 
     return filters
 
@@ -95,10 +119,14 @@ def concat_segments(
     tmp_dir: Path,
     *,
     denoise: bool,
+    post_denoise: bool,
+    leveler: bool,
     highpass_hz: int,
     lowpass_hz: int,
+    equalizer: bool,
     compressor: bool,
     normalize: bool,
+    limiter: bool,
 ) -> None:
     concat_list = tmp_dir / "concat.txt"
     concat_list.write_text("".join(f"file '{path}'\n" for path in parts))
@@ -122,10 +150,14 @@ def concat_segments(
     ext = output_path.suffix.lower()
     audio_filters = build_podcast_filter_chain(
         denoise=denoise,
+        post_denoise=post_denoise,
+        leveler=leveler,
         highpass_hz=highpass_hz,
         lowpass_hz=lowpass_hz,
+        equalizer=equalizer,
         compressor=compressor,
         normalize=normalize,
+        limiter=limiter,
     )
     cmd = ["ffmpeg", "-y", "-i", str(merged_wav)]
     if audio_filters:
@@ -166,9 +198,29 @@ def main() -> None:
         help="Disable broadband denoise",
     )
     parser.add_argument(
+        "--no-post-denoise",
+        action="store_true",
+        help="Disable the light cleanup denoise pass after compression and normalization",
+    )
+    parser.add_argument(
+        "--no-leveler",
+        action="store_true",
+        help="Disable the pre-compression speech leveling stage",
+    )
+    parser.add_argument(
+        "--no-eq",
+        action="store_true",
+        help="Disable spoken-word equalizer shaping",
+    )
+    parser.add_argument(
         "--no-compressor",
         action="store_true",
         help="Disable spoken-word compression",
+    )
+    parser.add_argument(
+        "--no-limiter",
+        action="store_true",
+        help="Disable final true-peak safety limiting",
     )
     parser.add_argument(
         "--highpass-hz",
@@ -203,10 +255,14 @@ def main() -> None:
             output_path,
             tmp_dir,
             denoise=not args.no_denoise,
+            post_denoise=not args.no_post_denoise,
+            leveler=not args.no_leveler,
             highpass_hz=max(0, args.highpass_hz),
             lowpass_hz=max(0, args.lowpass_hz),
+            equalizer=not args.no_eq,
             compressor=not args.no_compressor,
             normalize=not args.no_normalize,
+            limiter=not args.no_limiter,
         )
 
     print(f"rendered: {output_path}")
