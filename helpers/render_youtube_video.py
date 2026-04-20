@@ -32,6 +32,17 @@ def main() -> None:
         action="store_true",
         help="Burn subtitles into the output video",
     )
+    parser.add_argument(
+        "--preset",
+        default="veryfast",
+        help="ffmpeg x264 preset. Defaults to veryfast for long-form podcast renders",
+    )
+    parser.add_argument(
+        "--fps",
+        type=int,
+        default=1,
+        help="Output frame rate for static-image video. Defaults to 1 fps",
+    )
     parser.add_argument("-o", "--output", type=Path, default=None, help="Defaults to <edit_dir>/final.mp4")
     args = parser.parse_args()
 
@@ -56,12 +67,16 @@ def main() -> None:
         "-y",
         "-loop",
         "1",
+        "-framerate",
+        str(max(1, args.fps)),
         "-i",
         str(image_path),
         "-i",
         str(audio_input),
         "-c:v",
         "libx264",
+        "-preset",
+        args.preset,
         "-tune",
         "stillimage",
         "-c:a",

@@ -17,26 +17,54 @@
 - 產出 reels
 - 產出 `show_notes.md`、`timestamps.txt`、`youtube_description.md`
 
-## Arch Linux 安裝
+## 前置安裝
 
-先安裝系統套件：
+需要先有：
+
+- `ffmpeg`
+- Python `3.10+`
+- `uv`
+
+各平台建議安裝方式：
+
+Ubuntu / Debian：
+
+```bash
+sudo apt update
+sudo apt install -y ffmpeg python3 python3-pip
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+macOS：
+
+```bash
+brew install ffmpeg python uv
+```
+
+Windows：
+
+- 安裝 `ffmpeg` 並加入 `PATH`
+- 安裝 Python `3.10+`
+- 依照 https://docs.astral.sh/uv/getting-started/installation/ 安裝 `uv`
+
+Arch Linux：
 
 ```bash
 sudo pacman -S ffmpeg python uv
 ```
 
-clone repo 後：
+接著設定 repo：
 
 ```bash
 git clone https://github.com/soanseng/podcast-use.git
 cd podcast-use
-```
-
-建立環境：
-
-```bash
 uv sync
 cp .env.example .env
+```
+
+再編輯 `.env`：
+
+```bash
 $EDITOR .env
 ```
 

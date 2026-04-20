@@ -25,25 +25,54 @@ This project is an audio-first fork concept inspired by `browser-use/video-use`,
 - Renders vertical reels with subtitles and generated visuals
 - Produces packaging artifacts for show notes, timestamps, and YouTube description
 
-## Arch Linux setup
+## Prerequisites
 
-Install system packages:
+You need:
+
+- `ffmpeg`
+- Python `3.10+`
+- `uv`
+
+Platform setup:
+
+Ubuntu / Debian:
+
+```bash
+sudo apt update
+sudo apt install -y ffmpeg python3 python3-pip
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+macOS:
+
+```bash
+brew install ffmpeg python uv
+```
+
+Windows:
+
+- install `ffmpeg` and add it to `PATH`
+- install Python `3.10+`
+- install `uv` from https://docs.astral.sh/uv/getting-started/installation/
+
+Arch Linux:
 
 ```bash
 sudo pacman -S ffmpeg python uv
 ```
 
-Sync dependencies with `uv`:
+Then set up the repo:
 
 ```bash
+git clone https://github.com/soanseng/podcast-use.git
 cd podcast-use
 uv sync
+cp .env.example .env
 ```
 
-Configure Groq:
+Configure API keys in `.env`:
 
 ```bash
-cp .env.example .env
 $EDITOR .env
 ```
 
