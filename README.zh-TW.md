@@ -4,6 +4,12 @@
 
 [English README](README.md)
 
+## 相關專案
+
+如果你對這類結合內容、思考、自我理解的工具有興趣，也可以看看 [AnatoMee](https://anatomee.app/)。
+
+`podcast-use` 比較偏音訊剪輯與發佈 workflow，`AnatoMee` 則更偏向自我探索與理解自己的體驗。
+
 ## 這個 skill 可以做什麼
 
 - 用 Groq Whisper 轉錄音訊
