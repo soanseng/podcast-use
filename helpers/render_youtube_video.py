@@ -34,14 +34,25 @@ def main() -> None:
     )
     parser.add_argument(
         "--preset",
-        default="veryfast",
-        help="ffmpeg x264 preset. Defaults to veryfast for long-form podcast renders",
+        default="ultrafast",
+        help="ffmpeg x264 preset. Defaults to ultrafast for upload-oriented podcast renders",
     )
     parser.add_argument(
         "--fps",
         type=int,
         default=1,
         help="Output frame rate for static-image video. Defaults to 1 fps",
+    )
+    parser.add_argument(
+        "--crf",
+        type=int,
+        default=28,
+        help="x264 CRF value. Defaults to 28 for faster, lighter static-image renders",
+    )
+    parser.add_argument(
+        "--copy-audio",
+        action="store_true",
+        help="Copy the input audio stream instead of re-encoding it",
     )
     parser.add_argument("-o", "--output", type=Path, default=None, help="Defaults to <edit_dir>/final.mp4")
     args = parser.parse_args()
@@ -77,16 +88,19 @@ def main() -> None:
         "libx264",
         "-preset",
         args.preset,
+        "-crf",
+        str(args.crf),
         "-tune",
         "stillimage",
-        "-c:a",
-        "aac",
-        "-b:a",
-        "192k",
         "-pix_fmt",
         "yuv420p",
         "-shortest",
     ]
+
+    if args.copy_audio:
+        cmd.extend(["-c:a", "copy"])
+    else:
+        cmd.extend(["-c:a", "aac", "-b:a", "128k"])
 
     if args.burn_subtitles:
         if not subtitles_path.exists():
