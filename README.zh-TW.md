@@ -155,6 +155,7 @@ uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-
 
 - 比例 `1:1`
 - 至少 `1400 x 1400`
+- 預設應該是「單集封面」，除非使用者明確說要整個節目的總封面
 
 建議和 YouTube 封面分開處理：
 

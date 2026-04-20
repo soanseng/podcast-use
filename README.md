@@ -320,6 +320,7 @@ Podcast cover suggestions:
 - aspect ratio: `1:1`
 - at least `1400 x 1400`
 - avoid tiny text or edge-cropped details
+- default to single-episode cover art unless the user explicitly wants show-level branding
 
 If the user wants a podcast cover, write a separate `edit/podcast_cover_prompt.md` tuned for square framing instead of reusing a 16:9 YouTube prompt unchanged.
 
