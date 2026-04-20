@@ -35,6 +35,7 @@ Do not introduce video-specific logic. This skill is for podcasts, interviews, m
 13. Before creating reels, propose attractive candidate segments first. Do not silently choose all reel clips without user review unless the user explicitly delegates the choice.
 14. Before generating any image, explicitly ask whether the user wants text baked into the image. Do not assume they want text on the image.
 15. Before generating any cover or reel image, explicitly ask for the desired visual style. If the user has no preference, propose 2 to 3 style directions based on the episode topic and ask them to choose.
+16. When the user is preparing to publish, default to offering the full publishing package: long-form YouTube video, reels, `show_notes.md`, `timestamps.txt`, and `youtube_description.md`.
 
 ## Required Tools
 
@@ -298,6 +299,28 @@ Rules:
 - `youtube_description.md` should start with a clean hook and episode summary, then timestamps, then links or placeholders
 - `show_notes.md` should be more detailed than the YouTube description
 - If links, sponsors, or CTAs are unknown, leave clear placeholders rather than inventing them
+
+### 11. Publishing Package
+
+If the user wants a publish-ready package, the default output set should be:
+
+- `final.mp3`
+- `final.srt`
+- `final.mp4`
+- `reels/` short videos
+- `show_notes.md`
+- `timestamps.txt`
+- `youtube_description.md`
+
+Recommended order:
+
+1. lock the edit
+2. render final audio
+3. build subtitles
+4. generate or collect cover art
+5. render the YouTube video
+6. propose reel candidates and render the selected reels
+7. write show notes, timestamps, and YouTube description
 
 ## Editing Guidance
 

@@ -274,6 +274,28 @@ Each reel entry can define:
 - build clip subtitles
 - render a vertical `mp4`
 
+## Publishing package
+
+For a publish-ready episode, this skill should normally produce:
+
+- `final.mp3`
+- `final.srt`
+- `final.mp4`
+- `reels/`
+- `show_notes.md`
+- `timestamps.txt`
+- `youtube_description.md`
+
+Recommended order:
+
+1. lock the edit
+2. render final audio
+3. build subtitles
+4. create or collect cover art
+5. render the YouTube video
+6. choose reels and render them
+7. write show notes, timestamps, and YouTube description
+
 Suggested image prompt shape:
 
 - topic and guest
