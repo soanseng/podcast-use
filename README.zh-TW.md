@@ -14,6 +14,7 @@
 - 產生字幕 `final.srt`
 - 產生 YouTube 靜態影片 `final.mp4`
 - 用 Gemini 生成封面圖與 reels 圖片
+- 產生 podcast 方形封面圖
 - 產出 reels
 - 產出 `show_notes.md`、`timestamps.txt`、`youtube_description.md`
 
@@ -149,6 +150,27 @@ uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-
 - 想要什麼風格
 - 如果沒想法，先給 2 到 3 個風格方向選
 - reels 要不要每支同一風格，或每支都不同
+
+如果是 podcast 封面圖，建議規格是：
+
+- 比例 `1:1`
+- 至少 `1400 x 1400`
+
+建議和 YouTube 封面分開處理：
+
+- YouTube 封面：`16:9`
+- podcast 封面：`1:1`，至少 `1400 x 1400`
+
+建議路徑：
+
+- `edit/cover.png` 給 YouTube
+- `edit/podcast_cover.png` 給 podcast 平台
+
+如果要 AI 生成 podcast 封面，建議另外寫：
+
+- `edit/podcast_cover_prompt.md`
+
+不要直接把 16:9 的 YouTube prompt 原封不動拿來用。
 
 ## glossary
 

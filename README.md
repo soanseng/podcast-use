@@ -22,6 +22,7 @@ This project is an audio-first fork concept inspired by `browser-use/video-use`,
 - Builds subtitles as `.srt`
 - Creates a static-image YouTube `.mp4`
 - Generates YouTube cover art with Gemini image models
+- Generates square podcast cover art
 - Renders vertical reels with subtitles and generated visuals
 - Produces packaging artifacts for show notes, timestamps, and YouTube description
 
@@ -210,6 +211,17 @@ uv run helpers/generate_gemini_image.py \
   --output /path/to/edit/cover.png
 ```
 
+Generate a podcast cover image:
+
+- recommended aspect ratio: `1:1`
+- recommended minimum size: `1400 x 1400`
+- suggested path: `edit/podcast_cover.png`
+
+If you want both formats, treat them separately:
+
+- YouTube cover: `16:9`
+- podcast cover: `1:1`, at least `1400 x 1400`
+
 Render a static-image YouTube video:
 
 ```bash
@@ -270,6 +282,7 @@ edit/
 ├── timestamps.txt
 ├── youtube_description.md
 ├── cover_prompt.md
+├── podcast_cover_prompt.md
 ├── reels_plan.json
 └── reels/
 ```
@@ -299,7 +312,16 @@ Two supported paths:
 Recommended convention:
 
 - Put the chosen image at `edit/cover.png` or `edit/cover.jpg`
+- Put the podcast cover at `edit/podcast_cover.png` or `edit/podcast_cover.jpg`
 - If the user wants AI generation, have Claude write `edit/cover_prompt.md` first
+
+Podcast cover suggestions:
+
+- aspect ratio: `1:1`
+- at least `1400 x 1400`
+- avoid tiny text or edge-cropped details
+
+If the user wants a podcast cover, write a separate `edit/podcast_cover_prompt.md` tuned for square framing instead of reusing a 16:9 YouTube prompt unchanged.
 
 Before generating the cover image, ask:
 

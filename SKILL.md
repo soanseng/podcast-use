@@ -31,6 +31,7 @@ Do not introduce video-specific logic. This skill is for podcasts, interviews, m
 9. If the user wants a YouTube package, produce all requested deliverables together: audio, subtitles, cover-image path or prompt, timestamps, show notes, and YouTube description.
 10. If the material includes proper nouns, guest names, mixed-language speech, or Taiwanese, ask the user for glossary terms before final transcription.
 11. If the user wants a YouTube cover image, prefer generating `edit/cover.png` from `cover_prompt.md` with Gemini unless they already have artwork.
+11A. If the user wants podcast cover art, treat it as a separate deliverable from the YouTube cover. Default to a square `1:1` image, at least `1400 x 1400`, and keep its prompt in `edit/podcast_cover_prompt.md`.
 12. If the user wants reels, ask how many they want, usually 3-5, and discuss a visual style before generating images.
 13. Before creating reels, propose attractive candidate segments first. Do not silently choose all reel clips without user review unless the user explicitly delegates the choice.
 14. Before generating any image, explicitly ask whether the user wants text baked into the image. Do not assume they want text on the image.
@@ -62,6 +63,7 @@ source_dir/
     ├── timestamps.txt
     ├── youtube_description.md
     ├── cover_prompt.md
+    ├── podcast_cover_prompt.md
     ├── reels_plan.json
     └── reels/
 ```
@@ -200,6 +202,8 @@ Recommended paths:
 
 - `edit/cover.png`
 - `edit/cover.jpg`
+- `edit/podcast_cover.png`
+- `edit/podcast_cover.jpg`
 
 If the user wants AI-generated art:
 
@@ -215,6 +219,13 @@ Suggested questions before cover generation:
 
 - Do you want text inside the image, or artwork only?
 - What style do you want for the cover?
+
+If the user also wants podcast cover art:
+
+- write a separate `edit/podcast_cover_prompt.md`
+- optimize for square `1:1` framing
+- target at least `1400 x 1400`
+- avoid reusing a 16:9 YouTube composition unchanged
 
 If the user has no style preference, propose options such as:
 
