@@ -6,7 +6,7 @@ from pathlib import Path
 
 TEMPLATE = """{
   "global_style": "Bold editorial collage with cinematic lighting and strong typography space",
-  "global_note": "Keep reels between 30 and 60 seconds. Prioritize one idea per reel.",
+  "global_note": "Keep reels between 30 and 60 seconds. Prioritize one idea per reel. Reels must be vertical 9:16.",
   "reels": [
     {
       "id": "reel_01",
@@ -15,6 +15,9 @@ TEMPLATE = """{
       "end": 165.0,
       "title": "AI 讓時間加倍？",
       "hook": "當你懂一點技術，又有 AI，很多以前做不到的事突然做得到了。",
+      "why_it_works": "Strong claim, immediate curiosity, and clear self-contained idea.",
+      "style_tag": "cinematic philosophical",
+      "aspect_ratio": "9:16",
       "image_prompt": "A thoughtful Taiwanese podcast visual about AI multiplying human time, cinematic, editorial, vertical, strong focal subject, modern but human.",
       "intro": "本集精華"
     }
