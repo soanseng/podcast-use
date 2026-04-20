@@ -10,8 +10,11 @@ This project is an audio-first fork concept inspired by `browser-use/video-use`,
 - Packs word timestamps into a compact markdown view
 - Lets Claude Code reason over the transcript and produce an edit decision list
 - Renders a clean audio edit with ffmpeg
+- Applies spoken-word audio processing during render
 - Builds subtitles as `.srt`
 - Creates a static-image YouTube `.mp4`
+- Generates YouTube cover art with Gemini image models
+- Renders vertical reels with subtitles and generated visuals
 - Produces packaging artifacts for show notes, timestamps, and YouTube description
 
 ## Arch Linux setup
@@ -19,16 +22,14 @@ This project is an audio-first fork concept inspired by `browser-use/video-use`,
 Install system packages:
 
 ```bash
-sudo pacman -S ffmpeg python python-pip
+sudo pacman -S ffmpeg python uv
 ```
 
-Create a virtualenv and install Python deps:
+Sync dependencies with `uv`:
 
 ```bash
 cd podcast-use
-python -m venv .venv
-source .venv/bin/activate
-pip install -e .
+uv sync
 ```
 
 Configure Groq:
@@ -51,15 +52,15 @@ Put your audio files in a directory, then from Claude Code ask it to use the `po
 Manual helper usage:
 
 ```bash
-python helpers/transcribe_groq.py /path/to/audio.wav
-python helpers/pack_transcripts.py --edit-dir /path/to/edit
+uv run helpers/transcribe_groq.py /path/to/audio.wav
+uv run helpers/pack_transcripts.py --edit-dir /path/to/edit
 ```
 
 Choose a model explicitly when needed:
 
 ```bash
-python helpers/transcribe_groq.py /path/to/audio.wav --model whisper-large-v3-turbo
-python helpers/transcribe_groq.py /path/to/audio.wav --model whisper-large-v3
+uv run helpers/transcribe_groq.py /path/to/audio.wav --model whisper-large-v3-turbo
+uv run helpers/transcribe_groq.py /path/to/audio.wav --model whisper-large-v3
 ```
 
 Model guidance:
@@ -70,19 +71,43 @@ Model guidance:
 After Claude Code writes `edl.json`, render:
 
 ```bash
-python helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit
+uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit
+```
+
+Default spoken-word processing during render:
+
+- broadband denoise
+- high-pass filter at `80Hz`
+- low-pass filter at `13.5kHz`
+- light compression
+- `loudnorm` targeting podcast-style delivery
+
+Disable pieces when needed:
+
+```bash
+uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-denoise
+uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-compressor
+uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-normalize
 ```
 
 Build subtitles:
 
 ```bash
-python helpers/build_subtitles.py /path/to/audio.wav --edit-dir /path/to/edit
+uv run helpers/build_subtitles.py /path/to/audio.wav --edit-dir /path/to/edit
+```
+
+Generate a YouTube cover image with Gemini:
+
+```bash
+uv run helpers/generate_gemini_image.py \
+  --prompt-file /path/to/edit/cover_prompt.md \
+  --output /path/to/edit/cover.png
 ```
 
 Render a static-image YouTube video:
 
 ```bash
-python helpers/render_youtube_video.py /path/to/audio.wav \
+uv run helpers/render_youtube_video.py /path/to/audio.wav \
   --edit-dir /path/to/edit \
   --image /path/to/cover.png \
   --burn-subtitles
@@ -91,7 +116,36 @@ python helpers/render_youtube_video.py /path/to/audio.wav \
 Create metadata file skeletons:
 
 ```bash
-python helpers/init_deliverables.py /path/to/audio.wav --edit-dir /path/to/edit
+uv run helpers/init_deliverables.py /path/to/audio.wav --edit-dir /path/to/edit
+```
+
+Create a reels plan:
+
+```bash
+uv run helpers/init_reels_plan.py --edit-dir /path/to/edit
+```
+
+Render reels with generated images:
+
+```bash
+uv run helpers/render_reels.py /path/to/audio.wav \
+  --edit-dir /path/to/edit \
+  --generate-images
+```
+
+Create a glossary template for names and jargon:
+
+```bash
+uv run helpers/init_glossary.py --edit-dir /path/to/edit
+```
+
+Then retranscribe with the glossary:
+
+```bash
+uv run helpers/transcribe_groq.py /path/to/audio.wav \
+  --model whisper-large-v3 \
+  --glossary /path/to/edit/glossary.txt \
+  --force
 ```
 
 ## Edit output layout
@@ -102,13 +156,16 @@ edit/
 │   └── source.json
 ├── takes_packed.md
 ├── edl.json
+├── glossary.txt
 ├── final.mp3
 ├── final.srt
 ├── final.mp4
 ├── show_notes.md
 ├── timestamps.txt
 ├── youtube_description.md
-└── cover_prompt.md
+├── cover_prompt.md
+├── reels_plan.json
+└── reels/
 ```
 
 ## EDL format
@@ -137,6 +194,70 @@ Recommended convention:
 
 - Put the chosen image at `edit/cover.png` or `edit/cover.jpg`
 - If the user wants AI generation, have Claude write `edit/cover_prompt.md` first
+
+## Glossary workflow
+
+For proper nouns, brand names, mixed-language terms, Taiwanese phrases, and guest names, keep:
+
+- `edit/glossary.txt`
+
+Put one term per line, for example:
+
+```text
+覓己
+AnatoMee
+陳璿丞
+Claude Code
+ChatGPT
+Substack
+```
+
+Use glossary-driven retranscription for final episodes and subtitle passes.
+
+## Gemini image generation
+
+As of April 20, 2026, Google AI developer docs clearly document `gemini-2.5-flash-image` for Gemini image generation. This project also allows a configurable primary model before that fallback.
+
+Default behavior in this repo:
+
+- primary: `gemini-3.1-flash-image-preview`
+- fallback: `gemini-2.5-flash-image`
+
+If the primary model is unavailable, generation falls back automatically.
+
+Official docs:
+
+- https://ai.google.dev/gemini-api/docs/image-generation
+
+## Reels workflow
+
+Recommended conversation flow:
+
+1. Ask whether the user wants reels
+2. Ask how many, usually `3` to `5`
+3. Ask for a visual style, or propose 2-3 directions
+
+Good default style directions:
+
+- documentary editorial
+- cinematic philosophical
+- bold modern collage
+
+Each reel entry can define:
+
+- source audio
+- start and end time
+- title
+- hook
+- image prompt
+- intro label
+
+`render_reels.py` will:
+
+- extract the audio clip
+- generate an image when requested
+- build clip subtitles
+- render a vertical `mp4`
 
 Suggested image prompt shape:
 

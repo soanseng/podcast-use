@@ -29,12 +29,15 @@ Do not introduce video-specific logic. This skill is for podcasts, interviews, m
 7. Render a preview or final output only from an approved EDL.
 8. If the requested cut would destroy meaning or cadence, say so and propose a safer alternative.
 9. If the user wants a YouTube package, produce all requested deliverables together: audio, subtitles, cover-image path or prompt, timestamps, show notes, and YouTube description.
+10. If the material includes proper nouns, guest names, mixed-language speech, or Taiwanese, ask the user for glossary terms before final transcription.
+11. If the user wants a YouTube cover image, prefer generating `edit/cover.png` from `cover_prompt.md` with Gemini unless they already have artwork.
+12. If the user wants reels, ask how many they want, usually 3-5, and discuss a visual style before generating images.
 
 ## Required Tools
 
 - `ffmpeg`
 - `ffprobe`
-- Python environment with project dependencies installed
+- `uv`
 - `GROQ_API_KEY` in environment or repo `.env`
 
 ## Directory Layout
@@ -47,13 +50,16 @@ source_dir/
     │   └── episode.json
     ├── takes_packed.md
     ├── edl.json
+    ├── glossary.txt
     ├── final.mp3
     ├── final.srt
     ├── final.mp4
     ├── show_notes.md
     ├── timestamps.txt
     ├── youtube_description.md
-    └── cover_prompt.md
+    ├── cover_prompt.md
+    ├── reels_plan.json
+    └── reels/
 ```
 
 ## Process
@@ -69,10 +75,24 @@ source_dir/
 Run:
 
 ```bash
-python helpers/transcribe_groq.py /path/to/audio.wav
+uv run helpers/transcribe_groq.py /path/to/audio.wav
 ```
 
 This writes `edit/transcripts/<stem>.json`.
+
+If the user has special names or jargon, initialize a glossary and use it:
+
+```bash
+uv run helpers/init_glossary.py --edit-dir /path/to/edit
+uv run helpers/transcribe_groq.py /path/to/audio.wav --glossary /path/to/edit/glossary.txt --force
+```
+
+Glossary rules:
+
+- one term per line
+- include people, products, project names, brand names, publication names, and repeated Taiwanese terms
+- use glossary-driven retranscription for final output
+- do not assume ASR got mixed-language names correct
 
 Before transcribing, ask whether the user prefers:
 
@@ -84,8 +104,8 @@ If the user does not specify, default to `whisper-large-v3-turbo`.
 Explicit model selection:
 
 ```bash
-python helpers/transcribe_groq.py /path/to/audio.wav --model whisper-large-v3-turbo
-python helpers/transcribe_groq.py /path/to/audio.wav --model whisper-large-v3
+uv run helpers/transcribe_groq.py /path/to/audio.wav --model whisper-large-v3-turbo
+uv run helpers/transcribe_groq.py /path/to/audio.wav --model whisper-large-v3
 ```
 
 ### 3. Pack Transcript
@@ -93,7 +113,7 @@ python helpers/transcribe_groq.py /path/to/audio.wav --model whisper-large-v3
 Run:
 
 ```bash
-python helpers/pack_transcripts.py --edit-dir /path/to/edit
+uv run helpers/pack_transcripts.py --edit-dir /path/to/edit
 ```
 
 Read `takes_packed.md` as the primary editing surface.
@@ -129,17 +149,27 @@ Rules:
 Run:
 
 ```bash
-python helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit
+uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit
 ```
 
 This renders `edit/final.mp3` by default.
+
+Default render processing is tuned for spoken-word audio:
+
+- broadband denoise
+- high-pass filtering for low rumble
+- low-pass filtering for hiss control
+- light compression for level consistency
+- loudness normalization for podcast playback
+
+If the source is already mastered, disable filters selectively rather than stacking unnecessary processing.
 
 ### 7. Subtitles
 
 If the user wants subtitles or a YouTube package, run:
 
 ```bash
-python helpers/build_subtitles.py /path/to/audio.wav --edit-dir /path/to/edit
+uv run helpers/build_subtitles.py /path/to/audio.wav --edit-dir /path/to/edit
 ```
 
 This writes `edit/final.srt` aligned to the rendered output timeline.
@@ -160,15 +190,53 @@ If the user wants AI-generated art:
 - Optimize for 16:9 YouTube framing
 - Include title treatment guidance only if the image model can handle text well; otherwise recommend adding text later in a design tool
 
+Generate the image:
+
+```bash
+uv run helpers/generate_gemini_image.py --prompt-file /path/to/edit/cover_prompt.md --output /path/to/edit/cover.png
+```
+
+Notes:
+
+- This repo defaults to a configurable primary Gemini image model with fallback to `gemini-2.5-flash-image`
+- If the primary model is unavailable, it should fall back automatically
+- The final saved image is cropped and resized for the target frame
+
 ### 9. Static YouTube Video
 
 If the user wants an upload-ready video, run:
 
 ```bash
-python helpers/render_youtube_video.py /path/to/audio.wav --edit-dir /path/to/edit --image /path/to/cover.png --burn-subtitles
+uv run helpers/render_youtube_video.py /path/to/audio.wav --edit-dir /path/to/edit --image /path/to/cover.png --burn-subtitles
 ```
 
 This writes `edit/final.mp4`.
+
+### 9A. Reels
+
+If the user wants reels:
+
+1. Ask how many reels they want, usually `3` to `5`
+2. Ask whether they have a visual style in mind
+3. If not, propose a few styles such as documentary editorial, cinematic philosophical, or bold modern collage
+4. Initialize `reels_plan.json`
+5. Fill in clips, hook lines, titles, and image prompts
+6. Render with generated images and subtitles
+
+Commands:
+
+```bash
+uv run helpers/init_reels_plan.py --edit-dir /path/to/edit
+uv run helpers/render_reels.py /path/to/audio.wav --edit-dir /path/to/edit --generate-images
+```
+
+Each reel should usually:
+
+- be 30 to 60 seconds
+- focus on one strong idea
+- have a clear hook in the first seconds
+- use a mobile-first vertical image
+- include subtitles
 
 ### 10. Metadata Deliverables
 
@@ -184,7 +252,7 @@ Use the packed transcript and approved edit strategy to draft them.
 You may initialize the file set first:
 
 ```bash
-python helpers/init_deliverables.py /path/to/audio.wav --edit-dir /path/to/edit
+uv run helpers/init_deliverables.py /path/to/audio.wav --edit-dir /path/to/edit
 ```
 
 Rules:
