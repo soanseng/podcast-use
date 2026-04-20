@@ -70,6 +70,19 @@ $EDITOR .env
 
 ## 一鍵安裝成 skill
 
+### 用聊天直接安裝
+
+如果你希望是「貼一段話給 Claude Code / Codex，然後自動安裝好」，可以直接複製這些 prompt：
+
+- Claude Code 英文版：[prompts/install_claude_code_en.txt](prompts/install_claude_code_en.txt)
+- Claude Code 繁中版：[prompts/install_claude_code_zh-TW.txt](prompts/install_claude_code_zh-TW.txt)
+- Codex 英文版：[prompts/install_codex_en.txt](prompts/install_codex_en.txt)
+- Codex 繁中版：[prompts/install_codex_zh-TW.txt](prompts/install_codex_zh-TW.txt)
+
+這才是比較接近「對話式一鍵安裝」的使用方式。
+
+### 用 shell 安裝
+
 Claude Code：
 
 ```bash

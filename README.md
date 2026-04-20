@@ -78,6 +78,19 @@ $EDITOR .env
 
 ## Install as a skill
 
+### Install by chat
+
+If you want chat-first installation, copy one of these prompts into your client:
+
+- Claude Code, English: [prompts/install_claude_code_en.txt](prompts/install_claude_code_en.txt)
+- Claude Code, zh-TW: [prompts/install_claude_code_zh-TW.txt](prompts/install_claude_code_zh-TW.txt)
+- Codex, English: [prompts/install_codex_en.txt](prompts/install_codex_en.txt)
+- Codex, zh-TW: [prompts/install_codex_zh-TW.txt](prompts/install_codex_zh-TW.txt)
+
+This is the intended "one-shot" flow for users who prefer to install by conversation instead of manual shell steps.
+
+### Install by shell
+
 Paste one of these into your client shell after cloning the repo.
 
 Claude Code:

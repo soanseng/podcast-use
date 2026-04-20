@@ -1,0 +1,12 @@
+請幫我安裝這個 `podcast-use` skill：
+https://github.com/soanseng/podcast-use
+
+請依序完成：
+1. 在本機 clone 這個 repo。
+2. 安裝到 Codex 的 skills 目錄。
+3. 在 repo 裡執行 `uv sync`。
+4. 如果還沒有 `.env`，就把 `.env.example` 複製成 `.env`。
+5. 不要幫我填入 API key。
+6. 安裝完成後，確認這個 skill 已可使用。
+
+如果之前已經裝過，請直接原地更新，不要重複建立多份。

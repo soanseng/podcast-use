@@ -1,0 +1,12 @@
+Please install the `podcast-use` skill from:
+https://github.com/soanseng/podcast-use
+
+Steps:
+1. Clone the repository locally.
+2. Install it into your Codex skills directory.
+3. Run `uv sync` inside the repo.
+4. Copy `.env.example` to `.env` if `.env` does not exist yet.
+5. Do not fill in API keys for me.
+6. Confirm the skill is available after installation.
+
+If there is already an existing install, update it in place instead of creating duplicates.
