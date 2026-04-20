@@ -1,0 +1,15 @@
+[project]
+name = "podcast-use"
+version = "0.1.0"
+description = "Conversation-driven podcast editing skill for Claude Code"
+requires-python = ">=3.10"
+dependencies = [
+  "groq>=0.17.0",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = []
