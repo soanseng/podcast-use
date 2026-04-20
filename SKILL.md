@@ -32,6 +32,9 @@ Do not introduce video-specific logic. This skill is for podcasts, interviews, m
 10. If the material includes proper nouns, guest names, mixed-language speech, or Taiwanese, ask the user for glossary terms before final transcription.
 11. If the user wants a YouTube cover image, prefer generating `edit/cover.png` from `cover_prompt.md` with Gemini unless they already have artwork.
 12. If the user wants reels, ask how many they want, usually 3-5, and discuss a visual style before generating images.
+13. Before creating reels, propose attractive candidate segments first. Do not silently choose all reel clips without user review unless the user explicitly delegates the choice.
+14. Before generating any image, explicitly ask whether the user wants text baked into the image. Do not assume they want text on the image.
+15. Before generating any cover or reel image, explicitly ask for the desired visual style. If the user has no preference, propose 2 to 3 style directions based on the episode topic and ask them to choose.
 
 ## Required Tools
 
@@ -189,6 +192,21 @@ If the user wants AI-generated art:
 - Make it specific to the episode
 - Optimize for 16:9 YouTube framing
 - Include title treatment guidance only if the image model can handle text well; otherwise recommend adding text later in a design tool
+- Ask whether they want text baked into the image or a clean artwork-only image
+- Ask what style they want
+- If they do not know, propose 2 to 3 directions based on the topic
+
+Suggested questions before cover generation:
+
+- Do you want text inside the image, or artwork only?
+- What style do you want for the cover?
+
+If the user has no style preference, propose options such as:
+
+- documentary editorial
+- cinematic philosophical
+- bold modern collage
+- minimal high contrast
 
 Generate the image:
 
@@ -217,11 +235,21 @@ This writes `edit/final.mp4`.
 If the user wants reels:
 
 1. Ask how many reels they want, usually `3` to `5`
-2. Ask whether they have a visual style in mind
-3. If not, propose a few styles such as documentary editorial, cinematic philosophical, or bold modern collage
-4. Initialize `reels_plan.json`
-5. Fill in clips, hook lines, titles, and image prompts
-6. Render with generated images and subtitles
+2. Read the transcript and propose `5` to `8` attractive candidate segments first
+3. For each candidate, include:
+   - source file
+   - start and end time
+   - a short hook title
+   - why it works as a reel
+4. Ask the user to choose which segments to turn into reels
+5. Ask whether they have a visual style in mind
+6. If not, propose a few styles such as documentary editorial, cinematic philosophical, or bold modern collage
+7. Make sure the user understands reels are vertical `9:16` outputs
+8. Ask whether they want text baked into the reel images or clean artwork-only images
+9. If they want different reel images to have different styles, plan that explicitly
+10. Initialize `reels_plan.json`
+11. Fill in clips, hook lines, titles, image prompts, and style tags
+12. Render with generated images and subtitles
 
 Commands:
 
@@ -235,8 +263,17 @@ Each reel should usually:
 - be 30 to 60 seconds
 - focus on one strong idea
 - have a clear hook in the first seconds
-- use a mobile-first vertical image
+- use a mobile-first vertical `9:16` image
 - include subtitles
+
+When discussing reel imagery, ask about:
+
+- style direction
+- whether the user wants text baked into the image or clean artwork only
+- whether the look should be photographic, illustrative, editorial, collage, or minimal
+- whether all reels should share one style or each reel can use a different style
+
+If the user has no preference, propose 2 to 3 concrete style directions and recommend one.
 
 ### 10. Metadata Deliverables
 

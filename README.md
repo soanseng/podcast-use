@@ -195,6 +195,13 @@ Recommended convention:
 - Put the chosen image at `edit/cover.png` or `edit/cover.jpg`
 - If the user wants AI generation, have Claude write `edit/cover_prompt.md` first
 
+Before generating the cover image, ask:
+
+- whether the user wants text baked into the image or artwork only
+- what style direction they want
+
+If the user has no style preference, propose 2 to 3 options based on the episode topic.
+
 ## Glossary workflow
 
 For proper nouns, brand names, mixed-language terms, Taiwanese phrases, and guest names, keep:
@@ -235,7 +242,12 @@ Recommended conversation flow:
 
 1. Ask whether the user wants reels
 2. Ask how many, usually `3` to `5`
-3. Ask for a visual style, or propose 2-3 directions
+3. Propose `5` to `8` attractive candidate segments first
+4. Let the user choose which `3` to `5` to make
+5. Ask whether reel images should include text or be artwork only
+6. Ask for a visual style, or propose 2-3 directions
+7. Ask whether all reels should share one style or each reel can have a different style
+8. Confirm that reels are vertical `9:16` outputs
 
 Good default style directions:
 
@@ -251,6 +263,9 @@ Each reel entry can define:
 - hook
 - image prompt
 - intro label
+- style tag
+- aspect ratio, usually `9:16`
+- text in image or artwork only
 
 `render_reels.py` will:
 
