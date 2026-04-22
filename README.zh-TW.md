@@ -200,6 +200,14 @@ uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-
 uv run helpers/refine_srt_groq.py /path/to/edit/final.srt --edit-dir /path/to/edit
 ```
 
+如果你想一個指令直接完成「產生字幕 + 精煉字幕」，可以用：
+
+```bash
+uv run helpers/build_subtitles.py /path/to/audio.wav --edit-dir /path/to/edit --refine-groq
+```
+
+`--refine-groq` 本質上就是幫你接著呼叫 `refine_srt_groq.py`。
+
 預設：
 
 - 主模型：`qwen/qwen3-32b`

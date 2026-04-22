@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -101,12 +102,74 @@ def write_srt(cues: list[dict], output_path: Path) -> None:
     output_path.write_text("\n".join(lines))
 
 
+def run_refine_srt(
+    *,
+    srt_path: Path,
+    edit_dir: Path,
+    model: str,
+    fallback_model: str | None,
+    language: str,
+    batch_size: int,
+    reference_chars: int,
+) -> None:
+    cmd = [
+        sys.executable,
+        str(Path(__file__).resolve().parent / "refine_srt_groq.py"),
+        str(srt_path),
+        "--edit-dir",
+        str(edit_dir),
+        "--model",
+        model,
+        "--language",
+        language,
+        "--batch-size",
+        str(batch_size),
+        "--reference-chars",
+        str(reference_chars),
+    ]
+    if fallback_model:
+        cmd.extend(["--fallback-model", fallback_model])
+    subprocess.run(cmd, check=True)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build output-timeline subtitles from edl.json")
     parser.add_argument("audio", nargs="+", type=Path, help="One or more source audio paths")
     parser.add_argument("--edit-dir", type=Path, default=None, help="Defaults to <first_audio_dir>/edit")
     parser.add_argument("--max-words", type=int, default=6, help="Max words per subtitle cue")
     parser.add_argument("-o", "--output", type=Path, default=None, help="Defaults to <edit_dir>/final.srt")
+    parser.add_argument(
+        "--refine-groq",
+        action="store_true",
+        help="Run the optional Groq subtitle refinement pass after writing the SRT",
+    )
+    parser.add_argument(
+        "--refine-model",
+        default="qwen/qwen3-32b",
+        help="Primary Groq text model for subtitle refinement",
+    )
+    parser.add_argument(
+        "--refine-fallback-model",
+        default="openai/gpt-oss-120b",
+        help="Fallback Groq text model for subtitle refinement. Use an empty string to disable fallback.",
+    )
+    parser.add_argument(
+        "--refine-language",
+        default="zh-Hant",
+        help="Language hint for subtitle refinement",
+    )
+    parser.add_argument(
+        "--refine-batch-size",
+        type=int,
+        default=80,
+        help="Number of subtitle cues per refinement request",
+    )
+    parser.add_argument(
+        "--refine-reference-chars",
+        type=int,
+        default=12000,
+        help="Maximum reference context chars loaded during subtitle refinement",
+    )
     args = parser.parse_args()
 
     audio_paths = [path.resolve() for path in args.audio]
@@ -123,6 +186,16 @@ def main() -> None:
         sys.exit("no subtitle cues generated")
     write_srt(cues, output_path)
     print(f"wrote subtitles: {output_path}")
+    if args.refine_groq:
+        run_refine_srt(
+            srt_path=output_path,
+            edit_dir=edit_dir,
+            model=args.refine_model,
+            fallback_model=args.refine_fallback_model.strip() or None,
+            language=args.refine_language,
+            batch_size=max(1, args.refine_batch_size),
+            reference_chars=max(0, args.refine_reference_chars),
+        )
 
 
 if __name__ == "__main__":

@@ -198,6 +198,12 @@ If the user wants subtitles or a YouTube package, run:
 uv run helpers/build_subtitles.py /path/to/audio.wav --edit-dir /path/to/edit
 ```
 
+If the user wants a one-command automated subtitle post-pass, run:
+
+```bash
+uv run helpers/build_subtitles.py /path/to/audio.wav --edit-dir /path/to/edit --refine-groq
+```
+
 This writes `edit/final.srt` aligned to the rendered output timeline.
 
 If subtitle wording quality matters, the default Codex step after this is:
@@ -216,6 +222,8 @@ Optional automated post-pass with Groq:
 ```bash
 uv run helpers/refine_srt_groq.py /path/to/edit/final.srt --edit-dir /path/to/edit
 ```
+
+The `--refine-groq` flag on `build_subtitles.py` is a convenience wrapper for the same step.
 
 Default helper models:
 

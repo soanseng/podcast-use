@@ -222,6 +222,12 @@ Build subtitles:
 uv run helpers/build_subtitles.py /path/to/audio.wav --edit-dir /path/to/edit
 ```
 
+One-command subtitle build plus Groq refinement:
+
+```bash
+uv run helpers/build_subtitles.py /path/to/audio.wav --edit-dir /path/to/edit --refine-groq
+```
+
 In Codex, the default next step should be to review and refine `edit/final.srt` using the transcript, glossary, and context from the episode. The preferred rule is:
 
 - keep the same cue count
@@ -235,6 +241,8 @@ If you want a scripted post-pass, use the optional Groq helper:
 ```bash
 uv run helpers/refine_srt_groq.py /path/to/edit/final.srt --edit-dir /path/to/edit
 ```
+
+The `--refine-groq` flag on `build_subtitles.py` is a convenience wrapper around the same helper.
 
 Defaults for the helper:
 
