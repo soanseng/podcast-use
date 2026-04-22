@@ -21,7 +21,7 @@
 - 套用 podcast 向的聲音工程
 - 產生字幕 `final.srt`
 - 產生 YouTube 靜態影片 `final.mp4`
-- 用 Gemini 生成封面圖與 reels 圖片
+- 在 Codex 內預設優先用內建生圖；本地 helper 預設改用 OpenAI `gpt-image-2`，Gemini 為選配
 - 產生 podcast 方形封面圖
 - 產出 reels
 - 產出 `show_notes.md`、`timestamps.txt`、`youtube_description.md`
@@ -85,6 +85,13 @@ cp .env.example .env
 ```bash
 $EDITOR .env
 ```
+
+預設金鑰需求：
+
+- `GROQ_API_KEY`：轉錄必填
+- `OPENAI_API_KEY`：只有使用本地 OpenAI 生圖 helper 時需要
+- `GEMINI_API_KEY`：改用 Gemini 生圖時才需要
+- 如果是在 Codex 對話裡直接生圖，通常不需要另外填圖像 API key
 
 ## 一鍵安裝成 skill
 
@@ -168,6 +175,37 @@ uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-
 - 如果沒想法，先給 2 到 3 個風格方向選
 - reels 要不要每支同一風格，或每支都不同
 
+## 字幕精煉
+
+`build_subtitles.py` 產生 `edit/final.srt` 之後，如果是在 Codex 裡使用，預設下一步應該是讓 Codex 讀取：
+
+- `edit/final.srt`
+- `edit/transcripts/*.json`
+- `edit/glossary.txt`（如果有）
+
+然後只精煉字幕文字，不改時間軸、不改 cue 數量。
+
+建議規則：
+
+- 保持 cue 數量不變
+- 保持時間碼不變
+- 只修改文字內容
+- 繁中專案預設優先 `zh-Hant`
+- 人名、品牌、台語、混語詞優先依 glossary 保留
+- 沒把握就保守不改
+
+如果你想要自動化後處理，也可以用可選的 Groq helper：
+
+```bash
+uv run helpers/refine_srt_groq.py /path/to/edit/final.srt --edit-dir /path/to/edit
+```
+
+預設：
+
+- 主模型：`qwen/qwen3-32b`
+- fallback：`openai/gpt-oss-120b`
+- 語言提示：`zh-Hant`
+
 如果是 podcast 封面圖，建議規格是：
 
 - 比例 `1:1`
@@ -183,6 +221,42 @@ uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-
 
 - `edit/cover.png` 給 YouTube
 - `edit/podcast_cover.png` 給 podcast 平台
+
+如果是在 Codex 裡使用，預設應先用 Codex 內建生圖，並把輸出存成 `edit/cover.png`。
+
+如果需要走本地 helper，預設改用 OpenAI：
+
+```bash
+uv run helpers/generate_image.py \
+  --prompt-file /path/to/edit/cover_prompt.md \
+  --output /path/to/edit/cover.png
+```
+
+明確指定 OpenAI `gpt-image-2`：
+
+```bash
+uv run helpers/generate_image.py \
+  --provider openai \
+  --model gpt-image-2 \
+  --prompt-file /path/to/edit/cover_prompt.md \
+  --output /path/to/edit/cover.png
+```
+
+Gemini 相容路徑：
+
+```bash
+uv run helpers/generate_gemini_image.py \
+  --prompt-file /path/to/edit/cover_prompt.md \
+  --output /path/to/edit/cover.png
+```
+
+補充：
+
+- `generate_gemini_image.py` 現在是相容用 wrapper，底層共用 `generate_image.py`
+- 在 Codex 對話裡，應優先用內建生圖
+- 本地 `uv run ...` helper 預設 provider 改成 OpenAI `gpt-image-2`
+- Gemini 保留為選配相容路徑
+- Codex 對話裡的內建生圖不能當成這個 repo 的 `uv run ...` helper 穩定後端
 
 如果要 AI 生成 podcast 封面，建議另外寫：
 

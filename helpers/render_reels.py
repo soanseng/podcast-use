@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 
 from build_subtitles import chunk_words, format_srt_timestamp, load_words
-from generate_gemini_image import generate_image_file
+from generate_image import generate_image_file
 
 
 def run(cmd: list[str]) -> None:
@@ -158,17 +158,23 @@ def main() -> None:
     parser.add_argument(
         "--generate-images",
         action="store_true",
-        help="Generate missing reel images with Gemini",
+        help="Generate missing reel images with the configured provider",
+    )
+    parser.add_argument(
+        "--image-provider",
+        choices=["gemini", "openai"],
+        default="openai",
+        help="Image provider for generated reel art",
     )
     parser.add_argument(
         "--image-model",
-        default="gemini-3.1-flash-image-preview",
-        help="Primary Gemini image model",
+        default="gpt-image-2",
+        help="Primary image model",
     )
     parser.add_argument(
         "--fallback-image-model",
-        default="gemini-2.5-flash-image",
-        help="Fallback Gemini image model",
+        default="",
+        help="Fallback image model. Defaults to Gemini fallback only when provider=gemini.",
     )
     parser.add_argument("--max-words", type=int, default=6, help="Max words per subtitle cue")
     parser.add_argument(
@@ -197,6 +203,16 @@ def main() -> None:
 
     reels_dir = edit_dir / "reels"
     reels_dir.mkdir(parents=True, exist_ok=True)
+    image_model = (
+        "gemini-3.1-flash-image-preview"
+        if args.image_provider == "gemini" and args.image_model == "gpt-image-2"
+        else args.image_model
+    )
+    fallback_image_model = (
+        "gemini-2.5-flash-image"
+        if args.image_provider == "gemini" and not args.fallback_image_model.strip()
+        else args.fallback_image_model.strip() or None
+    )
 
     for reel in reels:
         reel_id = reel["id"]
@@ -233,13 +249,14 @@ def main() -> None:
             model_used = generate_image_file(
                 output_path=reel_image,
                 prompt=prompt,
-                primary_model=args.image_model,
-                fallback_model=args.fallback_image_model,
+                provider=args.image_provider,
+                primary_model=image_model,
+                fallback_model=fallback_image_model,
                 image_kind="reel",
                 width=1080,
                 height=1920,
             )
-            print(f"generated reel image {reel_image} via {model_used}")
+            print(f"generated reel image {reel_image} via {args.image_provider}/{model_used}")
         elif not reel_image.exists():
             sys.exit(f"missing reel image: {reel_image}. Use --generate-images or create it manually.")
 

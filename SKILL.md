@@ -15,6 +15,7 @@ This skill edits spoken-word audio with an audio-first workflow:
 4. Produce `edl.json`
 5. Render final audio with `ffmpeg`
 6. Build subtitles and YouTube packaging assets when requested
+7. Refine subtitle wording after `final.srt` is generated when subtitle quality matters
 
 Do not introduce video-specific logic. This skill is for podcasts, interviews, monologues, voice notes, and other spoken audio.
 
@@ -30,7 +31,7 @@ Do not introduce video-specific logic. This skill is for podcasts, interviews, m
 8. If the requested cut would destroy meaning or cadence, say so and propose a safer alternative.
 9. If the user wants a YouTube package, produce all requested deliverables together: audio, subtitles, cover-image path or prompt, timestamps, show notes, and YouTube description.
 10. If the material includes proper nouns, guest names, mixed-language speech, or Taiwanese, ask the user for glossary terms before final transcription.
-11. If the user wants a YouTube cover image, prefer generating `edit/cover.png` from `cover_prompt.md` with Gemini unless they already have artwork.
+11. If the user wants a YouTube cover image and you are running inside Codex, prefer using Codex's built-in image generation first and save the result to `edit/cover.png`. If local helper scripts are needed, default to OpenAI `gpt-image-2`. Gemini remains an optional fallback or compatibility path.
 11A. If the user wants podcast cover art, treat it as a separate deliverable from the YouTube cover. Default to a square `1:1` image, at least `1400 x 1400`, and keep its prompt in `edit/podcast_cover_prompt.md`. Unless the user explicitly says they want show-level branding, assume this is episode-specific cover art for a single episode, not the master cover for the whole podcast.
 12. If the user wants reels, ask how many they want, usually 3-5, and discuss a visual style before generating images.
 13. Before creating reels, propose attractive candidate segments first. Do not silently choose all reel clips without user review unless the user explicitly delegates the choice.
@@ -38,6 +39,7 @@ Do not introduce video-specific logic. This skill is for podcasts, interviews, m
 15. Before generating any cover or reel image, explicitly ask for the desired visual style. If the user has no preference, propose 2 to 3 style directions based on the episode topic and ask them to choose.
 16. When the user is preparing to publish, default to offering the full publishing package: long-form YouTube video, reels, `show_notes.md`, `timestamps.txt`, and `youtube_description.md`.
 17. For two-person or multi-person conversations, default to content editing and transcript packaging, not authoritative speaker attribution. Do not present speaker labels as reliable ground truth unless the user explicitly accepts manual review.
+18. After generating `final.srt`, if you are running inside Codex, default to refining the subtitle text using `final.srt`, transcript files, and `glossary.txt`. Do not change cue count or timestamps unless the user explicitly asks for subtitle re-timing.
 
 ## Required Tools
 
@@ -45,6 +47,8 @@ Do not introduce video-specific logic. This skill is for podcasts, interviews, m
 - `ffprobe`
 - `uv`
 - `GROQ_API_KEY` in environment or repo `.env`
+- `OPENAI_API_KEY` only if using local OpenAI image helpers
+- `GEMINI_API_KEY` or `GOOGLE_API_KEY` only if using the optional Gemini image workflow
 
 ## Directory Layout
 
@@ -196,6 +200,28 @@ uv run helpers/build_subtitles.py /path/to/audio.wav --edit-dir /path/to/edit
 
 This writes `edit/final.srt` aligned to the rendered output timeline.
 
+If subtitle wording quality matters, the default Codex step after this is:
+
+- read `edit/final.srt`
+- read `edit/transcripts/*.json`
+- read `edit/glossary.txt` if present
+- refine wording only
+- keep cue count and timestamps unchanged
+- prefer Traditional Chinese for zh-Hant projects
+- preserve names, brands, Taiwanese, and mixed-language terms
+- if uncertain, leave the original wording
+
+Optional automated post-pass with Groq:
+
+```bash
+uv run helpers/refine_srt_groq.py /path/to/edit/final.srt --edit-dir /path/to/edit
+```
+
+Default helper models:
+
+- primary: `qwen/qwen3-32b`
+- fallback: `openai/gpt-oss-120b`
+
 ### 8. Cover Image
 
 If the user already has art, ask them where the image lives and use it.
@@ -237,7 +263,21 @@ If the user has no style preference, propose options such as:
 - bold modern collage
 - minimal high contrast
 
-Generate the image:
+In Codex, prefer the built-in image tool first and save the chosen output to `edit/cover.png`.
+
+If a local helper is needed, generate the image with the default OpenAI path:
+
+```bash
+uv run helpers/generate_image.py --prompt-file /path/to/edit/cover_prompt.md --output /path/to/edit/cover.png
+```
+
+Or explicitly with OpenAI `gpt-image-2`:
+
+```bash
+uv run helpers/generate_image.py --provider openai --model gpt-image-2 --prompt-file /path/to/edit/cover_prompt.md --output /path/to/edit/cover.png
+```
+
+Gemini compatibility path:
 
 ```bash
 uv run helpers/generate_gemini_image.py --prompt-file /path/to/edit/cover_prompt.md --output /path/to/edit/cover.png
@@ -245,9 +285,11 @@ uv run helpers/generate_gemini_image.py --prompt-file /path/to/edit/cover_prompt
 
 Notes:
 
-- This repo defaults to a configurable primary Gemini image model with fallback to `gemini-2.5-flash-image`
-- If the primary model is unavailable, it should fall back automatically
+- In Codex sessions, prefer built-in image generation before local helpers
+- Local helper scripts default to OpenAI `gpt-image-2`
+- Gemini is available as an optional compatibility path with fallback to `gemini-2.5-flash-image`
 - The final saved image is cropped and resized for the target frame
+- Codex built-in image generation is not a stable backend for `uv run ...` helper automation, so scripted flows must still call a provider API directly
 
 ### 9. Static YouTube Video
 
@@ -285,6 +327,14 @@ Commands:
 ```bash
 uv run helpers/init_reels_plan.py --edit-dir /path/to/edit
 uv run helpers/render_reels.py /path/to/audio.wav --edit-dir /path/to/edit --generate-images
+```
+
+The default reel helper path uses OpenAI `gpt-image-2`.
+
+Gemini reel images:
+
+```bash
+uv run helpers/render_reels.py /path/to/audio.wav --edit-dir /path/to/edit --generate-images --image-provider gemini --image-model gemini-3.1-flash-image-preview
 ```
 
 Each reel should usually:

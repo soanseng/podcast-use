@@ -5,6 +5,7 @@
 [![ffmpeg](https://img.shields.io/badge/audio-ffmpeg-007808.svg)](https://ffmpeg.org/)
 [![Groq Whisper](https://img.shields.io/badge/STT-Groq%20Whisper-F55036.svg)](https://console.groq.com/docs/speech-to-text)
 [![Gemini Image](https://img.shields.io/badge/images-Gemini-4285F4.svg)](https://ai.google.dev/gemini-api/docs/image-generation)
+[![OpenAI Image](https://img.shields.io/badge/images-OpenAI-412991.svg)](https://developers.openai.com/api/docs/models/gpt-image-2)
 
 [繁體中文 README](README.zh-TW.md)
 
@@ -23,7 +24,7 @@ This project is an audio-first fork concept inspired by `browser-use/video-use`,
 - Applies spoken-word audio processing during render
 - Builds subtitles as `.srt`
 - Creates a static-image YouTube `.mp4`
-- Generates YouTube cover art with Gemini image models
+- In Codex, prefers built-in image generation for cover art; local helpers default to OpenAI `gpt-image-2`
 - Generates square podcast cover art
 - Renders vertical reels with subtitles and generated visuals
 - Produces packaging artifacts for show notes, timestamps, and YouTube description
@@ -87,6 +88,13 @@ Configure API keys in `.env`:
 ```bash
 $EDITOR .env
 ```
+
+Default key requirements:
+
+- `GROQ_API_KEY` is required for transcription
+- `OPENAI_API_KEY` is needed only if you use local OpenAI image helpers
+- `GEMINI_API_KEY` is optional and only needed if you choose the Gemini image workflow
+- In Codex sessions, you can often generate images with Codex directly and save them into the edit directory
 
 ## Install as a skill
 
@@ -214,7 +222,47 @@ Build subtitles:
 uv run helpers/build_subtitles.py /path/to/audio.wav --edit-dir /path/to/edit
 ```
 
-Generate a YouTube cover image with Gemini:
+In Codex, the default next step should be to review and refine `edit/final.srt` using the transcript, glossary, and context from the episode. The preferred rule is:
+
+- keep the same cue count
+- keep the same cue timing
+- refine text only
+- prefer Traditional Chinese for zh-Hant projects
+- preserve mixed-language names and glossary terms
+
+If you want a scripted post-pass, use the optional Groq helper:
+
+```bash
+uv run helpers/refine_srt_groq.py /path/to/edit/final.srt --edit-dir /path/to/edit
+```
+
+Defaults for the helper:
+
+- primary model: `qwen/qwen3-32b`
+- fallback model: `openai/gpt-oss-120b`
+- language hint: `zh-Hant`
+
+In Codex, prefer the built-in image tool first and save the result to `edit/cover.png`.
+
+If you need a local helper, generate a YouTube cover image with the default OpenAI path:
+
+```bash
+uv run helpers/generate_image.py \
+  --prompt-file /path/to/edit/cover_prompt.md \
+  --output /path/to/edit/cover.png
+```
+
+Explicit OpenAI `gpt-image-2`:
+
+```bash
+uv run helpers/generate_image.py \
+  --provider openai \
+  --model gpt-image-2 \
+  --prompt-file /path/to/edit/cover_prompt.md \
+  --output /path/to/edit/cover.png
+```
+
+Gemini compatibility path:
 
 ```bash
 uv run helpers/generate_gemini_image.py \
@@ -260,6 +308,18 @@ Render reels with generated images:
 uv run helpers/render_reels.py /path/to/audio.wav \
   --edit-dir /path/to/edit \
   --generate-images
+```
+
+This default reel helper path uses OpenAI `gpt-image-2`.
+
+Render reels with Gemini-generated images:
+
+```bash
+uv run helpers/render_reels.py /path/to/audio.wav \
+  --edit-dir /path/to/edit \
+  --generate-images \
+  --image-provider gemini \
+  --image-model gemini-3.1-flash-image-preview
 ```
 
 Create a glossary template for names and jargon:
@@ -361,20 +421,33 @@ Substack
 
 Use glossary-driven retranscription for final episodes and subtitle passes.
 
-## Gemini image generation
-
-As of April 20, 2026, Google AI developer docs clearly document `gemini-2.5-flash-image` for Gemini image generation. This project also allows a configurable primary model before that fallback.
+## Image generation providers
 
 Default behavior in this repo:
 
-- primary: `gemini-3.1-flash-image-preview`
-- fallback: `gemini-2.5-flash-image`
+- Codex sessions: prefer Codex built-in image generation first
+- local helper provider: `openai`
+- local helper primary model: `gpt-image-2`
+- no local helper fallback by default
 
-If the primary model is unavailable, generation falls back automatically.
+Optional OpenAI behavior:
+
+- local helper provider: `gemini`
+- local helper primary model: `gemini-3.1-flash-image-preview`
+- local helper fallback model: `gemini-2.5-flash-image`
+
+Provider notes:
+
+- Codex can generate images interactively in-session and that is the preferred path when the skill is running inside Codex
+- Local helper scripts default to OpenAI `gpt-image-2`
+- Gemini remains available when you explicitly pass `--provider gemini` or `--image-provider gemini`
+- `helpers/generate_gemini_image.py` remains available as a compatibility wrapper
+- Codex built-in image generation is not a stable backend for these local helper scripts
 
 Official docs:
 
-- https://ai.google.dev/gemini-api/docs/image-generation
+- Gemini: https://ai.google.dev/gemini-api/docs/image-generation
+- OpenAI: https://developers.openai.com/api/docs/models/gpt-image-2
 
 ## Reels workflow
 
