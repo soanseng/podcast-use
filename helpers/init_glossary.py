@@ -5,12 +5,17 @@ from pathlib import Path
 
 
 TEMPLATE = """# One term per line. Lines starting with # are ignored.
-覓己
-AnatoMee
-陳璿丞
-Claude Code
-ChatGPT
-Substack
+# People
+# Guest Name
+# Host Name
+
+# Products / brands
+# ProductName
+# CompanyName
+
+# Mixed-language or hard-to-spell terms
+# TechnicalTerm
+# LocalPhrase
 """
 
 

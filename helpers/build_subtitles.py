@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from edl_io import load_segments, resolve_edl_path
+
 
 def format_srt_timestamp(seconds: float) -> str:
     milliseconds = max(0, int(round(seconds * 1000)))
@@ -16,25 +18,6 @@ def format_srt_timestamp(seconds: float) -> str:
     secs = milliseconds // 1000
     milliseconds %= 1000
     return f"{hours:02d}:{minutes:02d}:{secs:02d},{milliseconds:03d}"
-
-
-def load_edl(edit_dir: Path, allowed_sources: set[str]) -> list[dict]:
-    edl_path = edit_dir / "edl.json"
-    if not edl_path.exists():
-        sys.exit(f"missing EDL: {edl_path}")
-    payload = json.loads(edl_path.read_text())
-    segments = []
-    for item in payload:
-        source = item.get("source")
-        if source not in allowed_sources:
-            continue
-        start = float(item["start"])
-        end = float(item["end"])
-        if end > start:
-            segments.append({"source": source, "start": start, "end": end})
-    if not segments:
-        sys.exit(f"no EDL segments found for sources {sorted(allowed_sources)}")
-    return segments
 
 
 def load_words(edit_dir: Path, source_stem: str) -> list[dict]:
@@ -133,9 +116,15 @@ def run_refine_srt(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Build output-timeline subtitles from edl.json")
+    parser = argparse.ArgumentParser(description="Build output-timeline subtitles from an EDL")
     parser.add_argument("audio", nargs="+", type=Path, help="One or more source audio paths")
     parser.add_argument("--edit-dir", type=Path, default=None, help="Defaults to <first_audio_dir>/edit")
+    parser.add_argument(
+        "--edl",
+        type=Path,
+        default=None,
+        help="Explicit EDL path. Defaults to edl.approved.json, edl.json, or edl.draft.json",
+    )
     parser.add_argument("--max-words", type=int, default=6, help="Max words per subtitle cue")
     parser.add_argument("-o", "--output", type=Path, default=None, help="Defaults to <edit_dir>/final.srt")
     parser.add_argument(
@@ -180,11 +169,13 @@ def main() -> None:
     output_path = args.output or (edit_dir / "final.srt")
 
     words_by_source = {path.stem: load_words(edit_dir, path.stem) for path in audio_paths}
-    edl = load_edl(edit_dir, set(words_by_source))
+    edl_path = resolve_edl_path(edit_dir, args.edl)
+    _, edl = load_segments(edit_dir, set(words_by_source), edl_path=edl_path)
     cues = build_cues(words_by_source, edl, max_words=max(1, args.max_words))
     if not cues:
         sys.exit("no subtitle cues generated")
     write_srt(cues, output_path)
+    print(f"edl: {edl_path}")
     print(f"wrote subtitles: {output_path}")
     if args.refine_groq:
         run_refine_srt(

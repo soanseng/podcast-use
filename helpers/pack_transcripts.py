@@ -72,14 +72,58 @@ def load_transcript(json_path: Path, silence_threshold: float) -> tuple[str, flo
     return json_path.stem, duration, phrases
 
 
+def phrase_stats(phrases: list[dict]) -> dict:
+    if not phrases:
+        return {
+            "phrase_count": 0,
+            "speech_span": 0.0,
+            "internal_gaps": 0.0,
+            "longest_gap": 0.0,
+            "longest_gap_at": None,
+        }
+    speech = sum(float(p["end"]) - float(p["start"]) for p in phrases)
+    gaps = 0.0
+    longest_gap = 0.0
+    longest_at = None
+    for prev, curr in zip(phrases, phrases[1:]):
+        gap = float(curr["start"]) - float(prev["end"])
+        if gap > 0:
+            gaps += gap
+            if gap > longest_gap:
+                longest_gap = gap
+                longest_at = float(prev["end"])
+    return {
+        "phrase_count": len(phrases),
+        "speech_span": speech,
+        "internal_gaps": gaps,
+        "longest_gap": longest_gap,
+        "longest_gap_at": longest_at,
+    }
+
+
 def render_markdown(entries: list[tuple[str, float, list[dict]]], silence_threshold: float) -> str:
     lines = [
         "# Packed transcripts",
         "",
         f"Phrase-level transcript grouped on silences >= {silence_threshold:.1f}s.",
-        "Use these ranges when drafting edl.json.",
+        "Use these ranges when drafting `edl.draft.json`.",
+        "",
+        "## Quick stats",
         "",
     ]
+    for name, duration, phrases in entries:
+        stats = phrase_stats(phrases)
+        gap_note = "n/a"
+        if stats["longest_gap_at"] is not None:
+            gap_note = f"{format_duration(stats['longest_gap'])} near {format_time(stats['longest_gap_at'])}"
+        lines.append(f"- **{name}**")
+        lines.append(f"  - duration: {format_duration(duration)}")
+        lines.append(f"  - phrases: {stats['phrase_count']}")
+        lines.append(f"  - speech in phrases: {format_duration(stats['speech_span'])}")
+        lines.append(f"  - internal gaps: {format_duration(stats['internal_gaps'])}")
+        lines.append(f"  - longest gap: {gap_note}")
+    lines.append("")
+
     for name, duration, phrases in entries:
         lines.append(f"## {name} (duration: {format_duration(duration)}, {len(phrases)} phrases)")
         if not phrases:

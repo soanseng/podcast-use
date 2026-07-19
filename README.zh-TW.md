@@ -6,44 +6,53 @@
 
 授權： [MIT](LICENSE)
 
+**先剪輯，後包裝。**
+
 ## 相關專案
 
 如果你對這類結合內容、思考、自我理解的工具有興趣，也可以看看 [AnatoMee](https://anatomee.app/)。
 
-`podcast-use` 比較偏音訊剪輯與發佈 workflow，`AnatoMee` 則更偏向自我探索與理解自己的體驗。
+`podcast-use` 偏音訊剪輯與發佈 workflow；`AnatoMee` 更偏向自我探索與理解自己。
 
 ## 這個 skill 可以做什麼
 
-- 用 Groq Whisper 轉錄音訊
-- 把 transcript 打包成適合閱讀與剪輯的 markdown
-- 讓 LLM 根據內容產生 `edl.json`
-- 用 `ffmpeg` 輸出剪好的 `final.mp3`
-- 套用 podcast 向的聲音工程
-- 產生字幕 `final.srt`
-- 產生 YouTube 靜態影片 `final.mp4`
-- 在 Codex 內預設優先用內建生圖；本地 helper 預設改用 OpenAI `gpt-image-2`，Gemini 為選配
-- 產生 podcast 方形封面圖
-- 產出 reels
-- 產出 `show_notes.md`、`timestamps.txt`、`youtube_description.md`
+- 用 Groq Whisper 轉錄（含 word timestamps，可快取）
+- 打包成適合閱讀與剪輯的 `takes_packed.md`
+- 分析靜音、贅詞候選、可能的重講片段
+- 讓 LLM 提出分級剪輯方案（安全 / 可選 / 有風險）
+- 產出可驗證的 EDL：`edl.draft.json` → `edl.approved.json`
+- 用 ffmpeg 渲 preview / final，並套用 spoken-word 聲音處理
+- 可選：字幕、YouTube 靜態影片、reels、show notes 等發佈素材
+
+## 設計原則
+
+1. **先鎖定模式** — cleanup / shorten / clip / takes / review-only / publish
+2. **先批准再 final render** — draft → preview → approve → final
+3. **不切字中** — 對齊 word timestamps
+4. **不做假 diarization** — 多人內容只依語意剪，不把講者標示當真值
+5. **包裝是第二階段** — 封面 / reels / 文案在剪輯鎖定後再做
 
 ## 目前限制
 
-- 目前這條 `Groq Whisper` workflow 不提供真正的 speaker diarization。
-- 雙人或多人對話仍然可以轉錄，也可以做內容剪輯。
-- 但講者標示不夠可靠，不能當成正式真值。
-- 不應把這個 skill 產出的 `Speaker A / Speaker B` 類型標示當成可直接發佈的正式 attribution。
-- 如果是訪談或多人對話，這個 skill 適合拿來做 transcript-driven editing，不適合拿來做權威講者標記。
-- 如果你需要正式可發佈等級的講者 attribution，請人工複核。
+- 這條 Groq Whisper workflow **不提供真正的 speaker diarization**
+- 雙人 / 多人仍可轉錄與內容剪輯
+- 不要把 `Speaker A / B` 當可發佈的正式 attribution
+- 贅詞 / 重講分析是啟發式，刪之前仍要判斷
+- 不是 DAW：不取代多軌混音、床樂編曲、複雜音效設計
 
 ## 前置安裝
 
-需要先有：
+需要：
 
-- `ffmpeg`
+- `ffmpeg` / `ffprobe`
 - Python `3.10+`
 - `uv`
+- 轉錄用 `GROQ_API_KEY`
 
-各平台建議安裝方式：
+可選：
+
+- 本地 OpenAI 生圖：`OPENAI_API_KEY`
+- Gemini 生圖：`GEMINI_API_KEY` 或 `GOOGLE_API_KEY`
 
 Ubuntu / Debian：
 
@@ -59,19 +68,7 @@ macOS：
 brew install ffmpeg python uv
 ```
 
-Windows：
-
-- 安裝 `ffmpeg` 並加入 `PATH`
-- 安裝 Python `3.10+`
-- 依照 https://docs.astral.sh/uv/getting-started/installation/ 安裝 `uv`
-
-Arch Linux：
-
-```bash
-sudo pacman -S ffmpeg python uv
-```
-
-接著設定 repo：
+接著：
 
 ```bash
 git clone https://github.com/soanseng/podcast-use.git
@@ -80,205 +77,187 @@ uv sync
 cp .env.example .env
 ```
 
-再編輯 `.env`：
-
-```bash
-$EDITOR .env
-```
-
-預設金鑰需求：
-
-- `GROQ_API_KEY`：轉錄必填
-- `OPENAI_API_KEY`：只有使用本地 OpenAI 生圖 helper 時需要
-- `GEMINI_API_KEY`：改用 Gemini 生圖時才需要
-- 如果是在 Codex 對話裡直接生圖，通常不需要另外填圖像 API key
-
 ## 一鍵安裝成 skill
 
-### 用聊天直接安裝
+### 用聊天安裝
 
-如果你希望是「貼一段話給 Claude Code / Codex，然後自動安裝好」，可以直接複製這些 prompt：
-
-- Claude Code 英文版：[prompts/install_claude_code_en.txt](prompts/install_claude_code_en.txt)
-- Claude Code 繁中版：[prompts/install_claude_code_zh-TW.txt](prompts/install_claude_code_zh-TW.txt)
-- Codex 英文版：[prompts/install_codex_en.txt](prompts/install_codex_en.txt)
-- Codex 繁中版：[prompts/install_codex_zh-TW.txt](prompts/install_codex_zh-TW.txt)
-
-這才是比較接近「對話式一鍵安裝」的使用方式。
+- Claude Code 英文：[prompts/install_claude_code_en.txt](prompts/install_claude_code_en.txt)
+- Claude Code 繁中：[prompts/install_claude_code_zh-TW.txt](prompts/install_claude_code_zh-TW.txt)
+- Codex 英文：[prompts/install_codex_en.txt](prompts/install_codex_en.txt)
+- Codex 繁中：[prompts/install_codex_zh-TW.txt](prompts/install_codex_zh-TW.txt)
 
 ### 用 shell 安裝
 
-Claude Code：
-
 ```bash
-git clone https://github.com/soanseng/podcast-use.git && cd podcast-use && ./scripts/install_skill.sh claude
+./scripts/install_skill.sh claude   # Claude Code
+./scripts/install_skill.sh codex    # Codex
 ```
 
-Codex：
+安裝後重啟對應客戶端。
+
+## 建議工作流
+
+把音檔放進資料夾，然後請 Claude Code / Codex 使用 `podcast-use` skill。
+
+手動 helper 流程：
 
 ```bash
-git clone https://github.com/soanseng/podcast-use.git && cd podcast-use && ./scripts/install_skill.sh codex
-```
+# 0) 狀態檔
+uv run helpers/init_status.py --edit-dir /path/to/edit
 
-安裝完後，重啟對應客戶端。
+# 1) 專有名詞 glossary（建議）
+uv run helpers/init_glossary.py --edit-dir /path/to/edit
+$EDITOR /path/to/edit/glossary.txt
 
-## 聲音工程
+# 2) 轉錄（預設 turbo；定稿可用 large-v3 + glossary）
+uv run helpers/transcribe_groq.py /path/to/audio.wav
+uv run helpers/transcribe_groq.py /path/to/audio.wav \
+  --model whisper-large-v3 \
+  --glossary /path/to/edit/glossary.txt \
+  --force
 
-目前預設的 spoken-word chain 是用 `ffmpeg` 近似廣播 / Audacity 類型流程，不是逐項完全複製 Audacity 演算法，但順序和目的接近：
+# 3) 打包 + 分析
+uv run helpers/pack_transcripts.py --edit-dir /path/to/edit
+uv run helpers/analyze_audio.py /path/to/audio.wav --edit-dir /path/to/edit
 
-1. 前段降噪
-2. 前段 speech leveling，近似第一次正規化
-3. high-pass 去低頻 rumble
-4. low-pass 壓高頻 hiss
-5. spoken-word EQ
-6. 輕壓縮
-7. loudness normalize
-8. 後段輕降噪
-9. limiter
+# 4) agent 寫好 edl.draft.json 後
+uv run helpers/validate_edl.py --edit-dir /path/to/edit --edl /path/to/edit/edl.draft.json
+uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit \
+  --edl /path/to/edit/edl.draft.json --preview
 
-對應 helper：
-
-```bash
+# 5) 批准 + final
+uv run helpers/approve_edl.py --edit-dir /path/to/edit
 uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit
 ```
 
-可選擇關閉部分處理：
+### 模式
 
-```bash
-uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-denoise
-uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-leveler
-uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-eq
-uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-compressor
-uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-normalize
-uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-post-denoise
-uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-limiter
+| 模式 | 用途 |
+|------|------|
+| `cleanup` | 去贅字、死空氣、口誤 |
+| `shorten` | 壓長度、去離題 |
+| `clip` | 抽精華片段 |
+| `takes` | 多 take 選句 |
+| `review-only` | 只給建議，不渲染 |
+| `publish` | 剪輯鎖定後做完整上架包 |
+
+## 目錄結構
+
+```text
+edit/
+├── STATUS.md
+├── transcripts/
+├── analysis/
+├── takes_packed.md
+├── cut_proposal.md
+├── edl.draft.json
+├── edl.approved.json
+├── edl.json
+├── preview.mp3
+├── final.mp3
+├── final.srt
+├── final.mp4
+├── show_notes.md
+├── timestamps.txt
+├── youtube_description.md
+└── reels/
 ```
 
-## 發佈包
+## EDL
 
-如果目標是上架，這個 skill 預設應該一起產出：
-
-- `final.mp3`
-- `final.srt`
-- `final.mp4`
-- `reels/`
-- `show_notes.md`
-- `timestamps.txt`
-- `youtube_description.md`
-
-## 圖片流程
-
-生成封面或 reels 圖片前，skill 應該先問：
-
-- 要不要把文字直接做進圖片
-- 想要什麼風格
-- 如果沒想法，先給 2 到 3 個風格方向選
-- reels 要不要每支同一風格，或每支都不同
-
-## 字幕精煉
-
-`build_subtitles.py` 產生 `edit/final.srt` 之後，如果是在 Codex 裡使用，預設下一步應該是讓 Codex 讀取：
-
-- `edit/final.srt`
-- `edit/transcripts/*.json`
-- `edit/glossary.txt`（如果有）
-
-然後只精煉字幕文字，不改時間軸、不改 cue 數量。
-
-建議規則：
-
-- 保持 cue 數量不變
-- 保持時間碼不變
-- 只修改文字內容
-- 繁中專案預設優先 `zh-Hant`
-- 人名、品牌、台語、混語詞優先依 glossary 保留
-- 沒把握就保守不改
-
-如果你想要自動化後處理，也可以用可選的 Groq helper：
-
-```bash
-uv run helpers/refine_srt_groq.py /path/to/edit/final.srt --edit-dir /path/to/edit
+```json
+[
+  {
+    "source": "episode",
+    "start": 1.20,
+    "end": 7.80,
+    "reason": "乾淨開場"
+  }
+]
 ```
 
-如果你想一個指令直接完成「產生字幕 + 精煉字幕」，可以用：
+- draft 寫入 `edl.draft.json`
+- 使用者確認後用 `approve_edl.py` 晉升
+- final render 應使用 approved EDL
+
+## 聲音工程
+
+Final 預設 spoken-word chain：
+
+1. 前段降噪
+2. speech leveling
+3. high-pass / low-pass
+4. EQ
+5. 輕壓縮
+6. loudness normalize
+7. 後段輕降噪
+8. limiter
+
+Preview（`--preview`）會跳過重處理，快速產出 `preview.mp3`。
 
 ```bash
+uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --preview
+uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --edge-pad-ms 60
+uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-denoise --no-eq
+```
+
+## 字幕與發佈
+
+```bash
+uv run helpers/build_subtitles.py /path/to/audio.wav --edit-dir /path/to/edit
 uv run helpers/build_subtitles.py /path/to/audio.wav --edit-dir /path/to/edit --refine-groq
+
+uv run helpers/init_deliverables.py /path/to/audio.wav --edit-dir /path/to/edit
+uv run helpers/render_youtube_video.py /path/to/audio.wav \
+  --edit-dir /path/to/edit \
+  --image /path/to/edit/cover.png \
+  --burn-subtitles
+
+uv run helpers/init_reels_plan.py --edit-dir /path/to/edit
+uv run helpers/render_reels.py /path/to/audio.wav --edit-dir /path/to/edit --generate-images
 ```
 
-`--refine-groq` 本質上就是幫你接著呼叫 `refine_srt_groq.py`。
+字幕精煉規則：不改 cue 數量與時間碼，只修文字；繁中專案優先 zh-Hant；人名品牌跟 glossary。
 
-預設：
+圖片：
 
-- 主模型：`qwen/qwen3-32b`
-- fallback：`openai/gpt-oss-120b`
-- 語言提示：`zh-Hant`
+- 有 runtime 內建生圖（如 Codex）時優先用
+- 本地 helper 預設 OpenAI `gpt-image-2`
+- Gemini 為選配
 
-如果是 podcast 封面圖，建議規格是：
+詳見 [references/publishing.md](references/publishing.md)、[references/images.md](references/images.md)。
 
-- 比例 `1:1`
-- 至少 `1400 x 1400`
-- 預設應該是「單集封面」，除非使用者明確說要整個節目的總封面
+## Skill 架構
 
-建議和 YouTube 封面分開處理：
+```text
+SKILL.md                 # 精簡主流程：模式、checkpoint、硬規則
+references/              # 剪輯判斷、EDL、發佈、圖片細節
+helpers/                 # 可執行工具
+```
 
-- YouTube 封面：`16:9`
-- podcast 封面：`1:1`，至少 `1400 x 1400`
+## Helper 一覽
 
-建議路徑：
+| Helper | 用途 |
+|--------|------|
+| `init_status.py` | 建立 `STATUS.md` |
+| `init_glossary.py` | glossary 模板 |
+| `transcribe_groq.py` | 轉錄 |
+| `pack_transcripts.py` | 打包 transcript + 統計 |
+| `analyze_audio.py` | 靜音 / 贅詞 / 重講提示 |
+| `validate_edl.py` | 驗證 EDL 與時長 |
+| `approve_edl.py` | draft → approved |
+| `render_audio.py` | preview / final 音訊 |
+| `build_subtitles.py` | 字幕 |
+| `render_youtube_video.py` | YouTube 靜態影片 |
+| `render_reels.py` | 直式短影片 |
+| `generate_image.py` | 本地生圖 |
+| `init_deliverables.py` | 文案骨架 |
 
-- `edit/cover.png` 給 YouTube
-- `edit/podcast_cover.png` 給 podcast 平台
+各 helper 請用 `--help` 看完整旗標。
 
-如果是在 Codex 裡使用，預設應先用 Codex 內建生圖，並把輸出存成 `edit/cover.png`。
-
-如果需要走本地 helper，預設改用 OpenAI：
+## 測試
 
 ```bash
-uv run helpers/generate_image.py \
-  --prompt-file /path/to/edit/cover_prompt.md \
-  --output /path/to/edit/cover.png
+uv sync --group dev
+uv run pytest
 ```
-
-明確指定 OpenAI `gpt-image-2`：
-
-```bash
-uv run helpers/generate_image.py \
-  --provider openai \
-  --model gpt-image-2 \
-  --prompt-file /path/to/edit/cover_prompt.md \
-  --output /path/to/edit/cover.png
-```
-
-Gemini 相容路徑：
-
-```bash
-uv run helpers/generate_gemini_image.py \
-  --prompt-file /path/to/edit/cover_prompt.md \
-  --output /path/to/edit/cover.png
-```
-
-補充：
-
-- `generate_gemini_image.py` 現在是相容用 wrapper，底層共用 `generate_image.py`
-- 在 Codex 對話裡，應優先用內建生圖
-- 本地 `uv run ...` helper 預設 provider 改成 OpenAI `gpt-image-2`
-- Gemini 保留為選配相容路徑
-- Codex 對話裡的內建生圖不能當成這個 repo 的 `uv run ...` helper 穩定後端
-
-如果要 AI 生成 podcast 封面，建議另外寫：
-
-- `edit/podcast_cover_prompt.md`
-
-不要直接把 16:9 的 YouTube prompt 原封不動拿來用。
-
-## glossary
-
-如果內容有：
-
-- 人名
-- 品牌名
-- 英中混用名詞
-- 台語詞
-
-建議先建立 `edit/glossary.txt`，一行一個詞，再重跑最終版轉錄。

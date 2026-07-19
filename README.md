@@ -4,49 +4,56 @@
 [![uv](https://img.shields.io/badge/package%20manager-uv-5C5CFF.svg)](https://github.com/astral-sh/uv)
 [![ffmpeg](https://img.shields.io/badge/audio-ffmpeg-007808.svg)](https://ffmpeg.org/)
 [![Groq Whisper](https://img.shields.io/badge/STT-Groq%20Whisper-F55036.svg)](https://console.groq.com/docs/speech-to-text)
-[![Gemini Image](https://img.shields.io/badge/images-Gemini-4285F4.svg)](https://ai.google.dev/gemini-api/docs/image-generation)
-[![OpenAI Image](https://img.shields.io/badge/images-OpenAI-412991.svg)](https://developers.openai.com/api/docs/models/gpt-image-2)
 
 [繁體中文 README](README.zh-TW.md)
 
 License: [MIT](LICENSE)
 
-Conversation-driven podcast editing skill for Claude Code.
+Conversation-driven podcast editing skill for Claude Code and Codex.
 
-This project is an audio-first fork concept inspired by `browser-use/video-use`, adapted for podcast and spoken-word editing workflows.
+**Edit first. Package later.**
+
+This project is an audio-first fork concept inspired by `browser-use/video-use`, adapted for podcast and spoken-word editing.
 
 ## What it does
 
-- Transcribes audio with Groq Whisper
-- Packs word timestamps into a compact markdown view
-- Lets Claude Code reason over the transcript and produce an edit decision list
-- Renders a clean audio edit with ffmpeg
-- Applies spoken-word audio processing during render
-- Builds subtitles as `.srt`
-- Creates a static-image YouTube `.mp4`
-- In Codex, prefers built-in image generation for cover art; local helpers default to OpenAI `gpt-image-2`
-- Generates square podcast cover art
-- Renders vertical reels with subtitles and generated visuals
-- Produces packaging artifacts for show notes, timestamps, and YouTube description
+- Transcribes spoken audio with Groq Whisper (word timestamps, cached)
+- Packs transcripts into a readable editing surface (`takes_packed.md`)
+- Analyzes silence, filler candidates, and possible retakes
+- Helps an agent propose tiered cuts (safe / optional / risky)
+- Builds a validated edit decision list (`edl.draft.json` → `edl.approved.json`)
+- Renders preview and final audio with ffmpeg + spoken-word processing
+- Optionally builds subtitles, YouTube video, reels, and publish metadata
+
+## Design principles
+
+1. **Mode-first** — cleanup, shorten, clip, takes, review-only, or publish
+2. **Approve before final render** — draft EDL, preview, then approve
+3. **Never cut mid-word** — align to transcript word boundaries
+4. **No fake diarization** — multi-speaker content is edited by meaning, not unreliable speaker labels
+5. **Packaging is stage two** — covers/reels/show notes after the edit is locked
 
 ## Current limitations
 
-- Groq Whisper does not provide true speaker diarization in this workflow.
-- Two-person or multi-person conversations can still be transcribed and edited by content.
-- Speaker labels are not reliable enough to present as ground truth.
-- Do not assume the skill can safely output formal `Speaker A / Speaker B` attribution without human review.
-- For interviews or conversations with multiple speakers, use this skill for transcript-driven editing, not authoritative speaker labeling.
-- If you need publication-grade speaker attribution, plan for manual review.
+- Groq Whisper does not provide true speaker diarization in this workflow
+- Multi-person conversations can still be transcribed and content-edited
+- Do not treat `Speaker A / B` labels as publication-grade attribution
+- Filler/retake analysis is heuristic — always review before cutting
+- Not a DAW replacement for music beds, multi-track mix, or complex sound design
 
 ## Prerequisites
 
-You need:
-
-- `ffmpeg`
+- `ffmpeg` / `ffprobe`
 - Python `3.10+`
 - `uv`
+- `GROQ_API_KEY` for transcription
 
-Platform setup:
+Optional:
+
+- `OPENAI_API_KEY` for local OpenAI image helpers
+- `GEMINI_API_KEY` / `GOOGLE_API_KEY` for Gemini image helpers
+
+### Platform setup
 
 Ubuntu / Debian:
 
@@ -68,13 +75,7 @@ Windows:
 - install Python `3.10+`
 - install `uv` from https://docs.astral.sh/uv/getting-started/installation/
 
-Arch Linux:
-
-```bash
-sudo pacman -S ffmpeg python uv
-```
-
-Then set up the repo:
+Then:
 
 ```bash
 git clone https://github.com/soanseng/podcast-use.git
@@ -83,277 +84,97 @@ uv sync
 cp .env.example .env
 ```
 
-Configure API keys in `.env`:
-
-```bash
-$EDITOR .env
-```
-
-Default key requirements:
-
-- `GROQ_API_KEY` is required for transcription
-- `OPENAI_API_KEY` is needed only if you use local OpenAI image helpers
-- `GEMINI_API_KEY` is optional and only needed if you choose the Gemini image workflow
-- In Codex sessions, you can often generate images with Codex directly and save them into the edit directory
-
 ## Install as a skill
 
 ### Install by chat
-
-If you want chat-first installation, copy one of these prompts into your client:
 
 - Claude Code, English: [prompts/install_claude_code_en.txt](prompts/install_claude_code_en.txt)
 - Claude Code, zh-TW: [prompts/install_claude_code_zh-TW.txt](prompts/install_claude_code_zh-TW.txt)
 - Codex, English: [prompts/install_codex_en.txt](prompts/install_codex_en.txt)
 - Codex, zh-TW: [prompts/install_codex_zh-TW.txt](prompts/install_codex_zh-TW.txt)
 
-This is the intended "one-shot" flow for users who prefer to install by conversation instead of manual shell steps.
-
 ### Install by shell
 
-Paste one of these into your client shell after cloning the repo.
-
-Claude Code:
-
 ```bash
+# Claude Code
 ./scripts/install_skill.sh claude
-```
 
-Codex:
-
-```bash
+# Codex
 ./scripts/install_skill.sh codex
 ```
 
-If you want the full clone-and-install flow in one paste:
-
-Claude Code:
+Or one-liner:
 
 ```bash
 git clone https://github.com/soanseng/podcast-use.git && cd podcast-use && ./scripts/install_skill.sh claude
 ```
 
-Codex:
+Restart the client after install.
+
+## Recommended workflow
+
+Put source audio in a folder, then ask Claude Code / Codex to use the `podcast-use` skill.
+
+Manual helper flow:
 
 ```bash
-git clone https://github.com/soanseng/podcast-use.git && cd podcast-use && ./scripts/install_skill.sh codex
-```
+# 0) session tracker
+uv run helpers/init_status.py --edit-dir /path/to/edit
 
-Manual Claude Code install:
-
-```bash
-ln -s "$(pwd)" ~/.claude/skills/podcast-use
-```
-
-Manual Codex install:
-
-```bash
-ln -s "$(pwd)" "${CODEX_HOME:-$HOME/.codex}/skills/podcast-use"
-```
-
-## Typical workflow
-
-Put your audio files in a directory, then from Claude Code ask it to use the `podcast-use` skill.
-
-Manual helper usage:
-
-```bash
-uv run helpers/transcribe_groq.py /path/to/audio.wav
-uv run helpers/pack_transcripts.py --edit-dir /path/to/edit
-```
-
-Choose a model explicitly when needed:
-
-```bash
-uv run helpers/transcribe_groq.py /path/to/audio.wav --model whisper-large-v3-turbo
-uv run helpers/transcribe_groq.py /path/to/audio.wav --model whisper-large-v3
-```
-
-Model guidance:
-
-- `whisper-large-v3-turbo`: faster and cheaper, good default for iterative editing
-- `whisper-large-v3`: slower and more expensive, better when transcript accuracy matters more
-
-After Claude Code writes `edl.json`, render:
-
-```bash
-uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit
-```
-
-Default spoken-word processing during render:
-
-- broadband denoise
-- speech leveling before compression
-- high-pass filter at `80Hz`
-- low-pass filter at `13.5kHz`
-- spoken-word equalizer shaping
-- light compression
-- `loudnorm` targeting podcast-style delivery
-- light post-processing denoise
-- final limiter for peak control
-
-This is intended to approximate a practical Audacity-style speech chain:
-
-- denoise
-- normalize
-- equalizer
-- compress
-- normalize
-- denoise
-- limiter
-
-It is not a bit-for-bit match for Audacity effects, but the processing intent is close and is tuned for spoken-word delivery.
-
-Disable pieces when needed:
-
-```bash
-uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-denoise
-uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-leveler
-uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-eq
-uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-compressor
-uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-normalize
-uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-post-denoise
-uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-limiter
-```
-
-Build subtitles:
-
-```bash
-uv run helpers/build_subtitles.py /path/to/audio.wav --edit-dir /path/to/edit
-```
-
-One-command subtitle build plus Groq refinement:
-
-```bash
-uv run helpers/build_subtitles.py /path/to/audio.wav --edit-dir /path/to/edit --refine-groq
-```
-
-In Codex, the default next step should be to review and refine `edit/final.srt` using the transcript, glossary, and context from the episode. The preferred rule is:
-
-- keep the same cue count
-- keep the same cue timing
-- refine text only
-- prefer Traditional Chinese for zh-Hant projects
-- preserve mixed-language names and glossary terms
-
-If you want a scripted post-pass, use the optional Groq helper:
-
-```bash
-uv run helpers/refine_srt_groq.py /path/to/edit/final.srt --edit-dir /path/to/edit
-```
-
-The `--refine-groq` flag on `build_subtitles.py` is a convenience wrapper around the same helper.
-
-Defaults for the helper:
-
-- primary model: `qwen/qwen3-32b`
-- fallback model: `openai/gpt-oss-120b`
-- language hint: `zh-Hant`
-
-In Codex, prefer the built-in image tool first and save the result to `edit/cover.png`.
-
-If you need a local helper, generate a YouTube cover image with the default OpenAI path:
-
-```bash
-uv run helpers/generate_image.py \
-  --prompt-file /path/to/edit/cover_prompt.md \
-  --output /path/to/edit/cover.png
-```
-
-Explicit OpenAI `gpt-image-2`:
-
-```bash
-uv run helpers/generate_image.py \
-  --provider openai \
-  --model gpt-image-2 \
-  --prompt-file /path/to/edit/cover_prompt.md \
-  --output /path/to/edit/cover.png
-```
-
-Gemini compatibility path:
-
-```bash
-uv run helpers/generate_gemini_image.py \
-  --prompt-file /path/to/edit/cover_prompt.md \
-  --output /path/to/edit/cover.png
-```
-
-Generate a podcast cover image:
-
-- recommended aspect ratio: `1:1`
-- recommended minimum size: `1400 x 1400`
-- suggested path: `edit/podcast_cover.png`
-
-If you want both formats, treat them separately:
-
-- YouTube cover: `16:9`
-- podcast cover: `1:1`, at least `1400 x 1400`
-
-Render a static-image YouTube video:
-
-```bash
-uv run helpers/render_youtube_video.py /path/to/audio.wav \
-  --edit-dir /path/to/edit \
-  --image /path/to/cover.png \
-  --burn-subtitles
-```
-
-Create metadata file skeletons:
-
-```bash
-uv run helpers/init_deliverables.py /path/to/audio.wav --edit-dir /path/to/edit
-```
-
-Create a reels plan:
-
-```bash
-uv run helpers/init_reels_plan.py --edit-dir /path/to/edit
-```
-
-Render reels with generated images:
-
-```bash
-uv run helpers/render_reels.py /path/to/audio.wav \
-  --edit-dir /path/to/edit \
-  --generate-images
-```
-
-This default reel helper path uses OpenAI `gpt-image-2`.
-
-Render reels with Gemini-generated images:
-
-```bash
-uv run helpers/render_reels.py /path/to/audio.wav \
-  --edit-dir /path/to/edit \
-  --generate-images \
-  --image-provider gemini \
-  --image-model gemini-3.1-flash-image-preview
-```
-
-Create a glossary template for names and jargon:
-
-```bash
+# 1) optional glossary for names / jargon
 uv run helpers/init_glossary.py --edit-dir /path/to/edit
-```
+$EDITOR /path/to/edit/glossary.txt
 
-Then retranscribe with the glossary:
-
-```bash
+# 2) transcribe (turbo default; use large-v3 for final accuracy)
+uv run helpers/transcribe_groq.py /path/to/audio.wav
 uv run helpers/transcribe_groq.py /path/to/audio.wav \
   --model whisper-large-v3 \
   --glossary /path/to/edit/glossary.txt \
   --force
+
+# 3) pack + analyze
+uv run helpers/pack_transcripts.py --edit-dir /path/to/edit
+uv run helpers/analyze_audio.py /path/to/audio.wav --edit-dir /path/to/edit
+
+# 4) after the agent writes edl.draft.json
+uv run helpers/validate_edl.py --edit-dir /path/to/edit --edl /path/to/edit/edl.draft.json
+uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit \
+  --edl /path/to/edit/edl.draft.json --preview
+
+# 5) approve + final
+uv run helpers/approve_edl.py --edit-dir /path/to/edit
+uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit
 ```
 
-## Edit output layout
+### Modes the skill should lock early
+
+| Mode | Goal |
+|------|------|
+| `cleanup` | fillers, dead air, slips |
+| `shorten` | hit a shorter target length |
+| `clip` | extract stand-alone clips |
+| `takes` | choose best takes across files |
+| `review-only` | advice only, no render |
+| `publish` | full upload package after edit is locked |
+
+## Edit directory layout
 
 ```text
 edit/
+├── STATUS.md
 ├── transcripts/
-│   └── source.json
+│   └── episode.json
+├── analysis/
+│   ├── episode_analysis.json
+│   └── episode_suggestions.md
 ├── takes_packed.md
-├── edl.json
+├── cut_proposal.md
+├── edl.draft.json
+├── edl.approved.json
+├── edl.json                 # alias of approved
+├── edl_validation.json
 ├── glossary.txt
+├── preview.mp3
 ├── final.mp3
 ├── final.srt
 ├── final.mp4
@@ -368,159 +189,125 @@ edit/
 
 ## EDL format
 
-`edl.json` is a JSON array:
-
 ```json
 [
   {
     "source": "episode",
     "start": 1.20,
     "end": 7.80,
+    "pad_in": 0.05,
+    "pad_out": 0.08,
     "reason": "Clean opening line"
   }
 ]
 ```
 
-## Cover image workflow
+- `source` must match the audio/transcript stem
+- cuts should sit on word boundaries
+- write drafts to `edl.draft.json`, promote with `approve_edl.py`
 
-Two supported paths:
+## Audio processing
 
-1. User-provided image
-2. AI-generated image from a prompt produced by the skill
+Default final chain (spoken-word oriented):
 
-Recommended convention:
+1. broadband denoise
+2. speech leveling
+3. high-pass / low-pass
+4. mild EQ
+5. light compression
+6. loudness normalize (`-16 LUFS` target)
+7. light post denoise
+8. limiter
 
-- Put the chosen image at `edit/cover.png` or `edit/cover.jpg`
-- Put the podcast cover at `edit/podcast_cover.png` or `edit/podcast_cover.jpg`
-- If the user wants AI generation, have Claude write `edit/cover_prompt.md` first
+Preview mode (`--preview`) skips heavy processing and writes `edit/preview.mp3` for faster iteration.
 
-Podcast cover suggestions:
+```bash
+uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --preview
+uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --edge-pad-ms 60
+uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --only-segment 2 --preview
 
-- aspect ratio: `1:1`
-- at least `1400 x 1400`
-- avoid tiny text or edge-cropped details
-- default to single-episode cover art unless the user explicitly wants show-level branding
-
-If the user wants a podcast cover, write a separate `edit/podcast_cover_prompt.md` tuned for square framing instead of reusing a 16:9 YouTube prompt unchanged.
-
-Before generating the cover image, ask:
-
-- whether the user wants text baked into the image or artwork only
-- what style direction they want
-
-If the user has no style preference, propose 2 to 3 options based on the episode topic.
-
-## Glossary workflow
-
-For proper nouns, brand names, mixed-language terms, Taiwanese phrases, and guest names, keep:
-
-- `edit/glossary.txt`
-
-Put one term per line, for example:
-
-```text
-覓己
-AnatoMee
-陳璿丞
-Claude Code
-ChatGPT
-Substack
+# disable stages on already-mastered sources
+uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-denoise --no-eq
 ```
 
-Use glossary-driven retranscription for final episodes and subtitle passes.
+## Subtitles and packaging
 
-## Image generation providers
+```bash
+uv run helpers/build_subtitles.py /path/to/audio.wav --edit-dir /path/to/edit
+uv run helpers/build_subtitles.py /path/to/audio.wav --edit-dir /path/to/edit --refine-groq
 
-Default behavior in this repo:
+uv run helpers/init_deliverables.py /path/to/audio.wav --edit-dir /path/to/edit
 
-- Codex sessions: prefer Codex built-in image generation first
-- local helper provider: `openai`
-- local helper primary model: `gpt-image-2`
-- no local helper fallback by default
+uv run helpers/render_youtube_video.py /path/to/audio.wav \
+  --edit-dir /path/to/edit \
+  --image /path/to/edit/cover.png \
+  --burn-subtitles
 
-Optional OpenAI behavior:
+uv run helpers/init_reels_plan.py --edit-dir /path/to/edit
+uv run helpers/render_reels.py /path/to/audio.wav --edit-dir /path/to/edit --generate-images
+```
 
-- local helper provider: `gemini`
-- local helper primary model: `gemini-3.1-flash-image-preview`
-- local helper fallback model: `gemini-2.5-flash-image`
+Image generation:
 
-Provider notes:
+- Prefer runtime built-in image tools when available (e.g. Codex)
+- Local default: OpenAI `gpt-image-2` via `helpers/generate_image.py`
+- Gemini remains an optional path
 
-- Codex can generate images interactively in-session and that is the preferred path when the skill is running inside Codex
-- Local helper scripts default to OpenAI `gpt-image-2`
-- Gemini remains available when you explicitly pass `--provider gemini` or `--image-provider gemini`
-- `helpers/generate_gemini_image.py` remains available as a compatibility wrapper
-- Codex built-in image generation is not a stable backend for these local helper scripts
+See [references/images.md](references/images.md) and [references/publishing.md](references/publishing.md).
 
-Official docs:
+## Skill architecture
 
-- Gemini: https://ai.google.dev/gemini-api/docs/image-generation
-- OpenAI: https://developers.openai.com/api/docs/models/gpt-image-2
+```text
+SKILL.md                     # short agent instructions (modes, checkpoints, hard rules)
+references/
+  modes.md                   # cleanup / shorten / clip / takes / review / publish
+  editing-playbook.md        # keep vs cut judgment
+  edl.md                     # EDL schema + validation
+  publishing.md              # subtitles, metadata, reels order
+  images.md                  # covers and image providers
+helpers/                     # executable tools
+```
 
-## Reels workflow
+## Helper index
 
-Recommended conversation flow:
+| Helper | Purpose |
+|--------|---------|
+| `init_status.py` | Create `STATUS.md` session tracker |
+| `init_glossary.py` | Glossary template |
+| `transcribe_groq.py` | Groq Whisper transcription |
+| `pack_transcripts.py` | Packed markdown + quick stats |
+| `analyze_audio.py` | Silence / filler / retake hints |
+| `validate_edl.py` | Validate cuts + duration report |
+| `approve_edl.py` | Promote draft EDL to approved |
+| `render_audio.py` | Preview/final audio render |
+| `build_subtitles.py` | Output-timeline SRT |
+| `refine_srt_groq.py` | Optional SRT wording refine |
+| `render_youtube_video.py` | Static-image YouTube MP4 |
+| `init_reels_plan.py` | Reels plan skeleton |
+| `render_reels.py` | Vertical short videos |
+| `generate_image.py` | Local image generation |
+| `init_deliverables.py` | Show notes / timestamps skeletons |
 
-1. Ask whether the user wants reels
-2. Ask how many, usually `3` to `5`
-3. Propose `5` to `8` attractive candidate segments first
-4. Let the user choose which `3` to `5` to make
-5. Ask whether reel images should include text or be artwork only
-6. Ask for a visual style, or propose 2-3 directions
-7. Ask whether all reels should share one style or each reel can have a different style
-8. Confirm that reels are vertical `9:16` outputs
+Every helper supports `--help`.
 
-Good default style directions:
+## Tests
 
-- documentary editorial
-- cinematic philosophical
-- bold modern collage
+```bash
+uv sync --group dev
+uv run pytest
+```
 
-Each reel entry can define:
+## Glossary
 
-- source audio
-- start and end time
-- title
-- hook
-- image prompt
-- intro label
-- style tag
-- aspect ratio, usually `9:16`
-- text in image or artwork only
+For people, brands, mixed-language terms, and local phrases:
 
-`render_reels.py` will:
+```bash
+uv run helpers/init_glossary.py --edit-dir /path/to/edit
+```
 
-- extract the audio clip
-- generate an image when requested
-- build clip subtitles
-- render a vertical `mp4`
+One term per line in `edit/glossary.txt`, then retranscribe with `--glossary` and `--force` for final accuracy.
 
-## Publishing package
+## Related
 
-For a publish-ready episode, this skill should normally produce:
-
-- `final.mp3`
-- `final.srt`
-- `final.mp4`
-- `reels/`
-- `show_notes.md`
-- `timestamps.txt`
-- `youtube_description.md`
-
-Recommended order:
-
-1. lock the edit
-2. render final audio
-3. build subtitles
-4. create or collect cover art
-5. render the YouTube video
-6. choose reels and render them
-7. write show notes, timestamps, and YouTube description
-
-Suggested image prompt shape:
-
-- topic and guest
-- mood and visual direction
-- composition for 16:9 YouTube frame
-- text treatment guidance
-- negative prompt guidance to avoid clutter or unreadable typography
+If you care about content, reflection, and self-understanding tools, see [AnatoMee](https://anatomee.app/).  
+`podcast-use` focuses on audio editing and publishing workflow; AnatoMee focuses on self-exploration.
