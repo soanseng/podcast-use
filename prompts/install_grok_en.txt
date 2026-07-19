@@ -1,0 +1,14 @@
+Please install the `podcast-use` skill from:
+https://github.com/soanseng/podcast-use
+
+Steps:
+1. Clone the repository locally (or use the existing checkout if present).
+2. Install it into the Grok skills directory: `~/.grok/skills/podcast-use`
+   Prefer: `./scripts/install_skill.sh grok`
+   Or symlink: `ln -sfn "$(pwd)" ~/.grok/skills/podcast-use`
+3. Run `uv sync` inside the repo.
+4. Copy `.env.example` to `.env` if `.env` does not exist yet.
+5. Do not fill in API keys for me.
+6. Confirm the skill is available after installation (symlink + SKILL.md present).
+
+If there is already an existing install, update it in place instead of creating duplicates.

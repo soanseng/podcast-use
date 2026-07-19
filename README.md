@@ -9,7 +9,7 @@
 
 License: [MIT](LICENSE)
 
-Conversation-driven podcast editing skill for Claude Code and Codex.
+Conversation-driven podcast editing skill for **Grok**, **Claude Code**, and **Codex**.
 
 **Edit first. Package later.**
 
@@ -41,19 +41,137 @@ This project is an audio-first fork concept inspired by `browser-use/video-use`,
 - Filler/retake analysis is heuristic — always review before cutting
 - Not a DAW replacement for music beds, multi-track mix, or complex sound design
 
-## Prerequisites
+---
 
-- `ffmpeg` / `ffprobe`
-- Python `3.10+`
-- `uv`
-- `GROQ_API_KEY` for transcription
+## Quick start (how to use)
 
-Optional:
+### 1. One-time setup
 
-- `OPENAI_API_KEY` for local OpenAI image helpers
-- `GEMINI_API_KEY` / `GOOGLE_API_KEY` for Gemini image helpers
+```bash
+git clone https://github.com/soanseng/podcast-use.git
+cd podcast-use
+uv sync
+cp .env.example .env
+# put GROQ_API_KEY in .env
+```
 
-### Platform setup
+Requirements: `ffmpeg`, `ffprobe`, Python `3.10+`, `uv`, and `GROQ_API_KEY`.
+
+Optional keys:
+
+- `OPENAI_API_KEY` — local cover/reel image helpers
+- `GEMINI_API_KEY` / `GOOGLE_API_KEY` — Gemini image path
+
+### 2. Install the skill into your agent
+
+```bash
+# Grok
+./scripts/install_skill.sh grok
+
+# Claude Code
+./scripts/install_skill.sh claude
+
+# Codex
+./scripts/install_skill.sh codex
+```
+
+This symlinks the repo into the client skills directory and runs `uv sync`.
+
+| Client | Skill path |
+|--------|------------|
+| Grok | `~/.grok/skills/podcast-use` |
+| Claude Code | `~/.claude/skills/podcast-use` |
+| Codex | `~/.codex/skills/podcast-use` |
+
+Restart the client or open a **new session** so the skill is discovered.
+
+### 3. Put your audio somewhere
+
+```text
+my-episode/
+└── episode.wav    # or .mp3 / .m4a / .flac
+```
+
+Artifacts will be written to `my-episode/edit/`.
+
+### 4. Talk to the agent (recommended)
+
+Open Grok / Claude Code / Codex in that folder (or point it at the audio path) and say things like:
+
+```text
+Use podcast-use. Clean up this podcast: remove fillers and dead air.
+/path/to/my-episode/episode.wav
+```
+
+Other useful prompts:
+
+```text
+Use podcast-use in shorten mode. Cut this to about 25 minutes.
+
+Use podcast-use. Review only first — summarize structure and suggest cuts, don't render yet.
+
+Use podcast-use. Extract 3 clip candidates for Shorts from this episode.
+
+Use podcast-use in publish mode after the edit is locked.
+```
+
+You can also invoke it as a slash command in Grok when the skill is installed: `/podcast-use`.
+
+### 5. What a normal conversation looks like
+
+1. **Mode** — agent asks cleanup / shorten / clip / takes / review-only / publish
+2. **Glossary** — optional names/brands for better ASR
+3. **Transcribe + pack + analyze**
+4. **Cut proposal** — safe / optional / risky tiers + estimated duration
+5. **You approve a tier**
+6. Agent writes `edit/edl.draft.json`
+7. **Validate + preview** (`edit/preview.mp3`)
+8. You listen and request changes if needed
+9. **Approve EDL → final render** (`edit/final.mp3`)
+10. Optional packaging: subtitles, covers, YouTube video, reels, show notes
+
+**Do not skip approval.** Final audio should come from an approved EDL.
+
+### Modes
+
+| Mode | Goal | Typical outputs |
+|------|------|-----------------|
+| `cleanup` | fillers, dead air, slips | `final.mp3` |
+| `shorten` | hit a shorter target length | `final.mp3` + cut rationale |
+| `clip` | extract stand-alone clips | clip audio (+ srt optional) |
+| `takes` | choose best takes across files | merged EDL + `final.mp3` |
+| `review-only` | advice only | brief + suggestions, no render |
+| `publish` | full upload package after edit is locked | audio + srt + video/reels/metadata |
+
+---
+
+## Install details
+
+### Install by chat
+
+Paste one of these into your agent:
+
+- Grok, English: [prompts/install_grok_en.txt](prompts/install_grok_en.txt)
+- Grok, zh-TW: [prompts/install_grok_zh-TW.txt](prompts/install_grok_zh-TW.txt)
+- Claude Code, English: [prompts/install_claude_code_en.txt](prompts/install_claude_code_en.txt)
+- Claude Code, zh-TW: [prompts/install_claude_code_zh-TW.txt](prompts/install_claude_code_zh-TW.txt)
+- Codex, English: [prompts/install_codex_en.txt](prompts/install_codex_en.txt)
+- Codex, zh-TW: [prompts/install_codex_zh-TW.txt](prompts/install_codex_zh-TW.txt)
+
+### Manual install
+
+```bash
+# Grok
+ln -sfn "$(pwd)" ~/.grok/skills/podcast-use
+
+# Claude Code
+ln -sfn "$(pwd)" ~/.claude/skills/podcast-use
+
+# Codex
+ln -sfn "$(pwd)" "${CODEX_HOME:-$HOME/.codex}/skills/podcast-use"
+```
+
+### Platform packages
 
 Ubuntu / Debian:
 
@@ -75,87 +193,64 @@ Windows:
 - install Python `3.10+`
 - install `uv` from https://docs.astral.sh/uv/getting-started/installation/
 
-Then:
+---
+
+## Manual helper workflow
+
+Use this if you prefer shell commands, or to understand what the skill runs under the hood.
+
+From the `podcast-use` repo (or any cwd if you pass absolute paths):
 
 ```bash
-git clone https://github.com/soanseng/podcast-use.git
-cd podcast-use
-uv sync
-cp .env.example .env
-```
+AUDIO=/path/to/episode.wav
+EDIT=/path/to/edit          # usually <audio_dir>/edit
 
-## Install as a skill
-
-### Install by chat
-
-- Claude Code, English: [prompts/install_claude_code_en.txt](prompts/install_claude_code_en.txt)
-- Claude Code, zh-TW: [prompts/install_claude_code_zh-TW.txt](prompts/install_claude_code_zh-TW.txt)
-- Codex, English: [prompts/install_codex_en.txt](prompts/install_codex_en.txt)
-- Codex, zh-TW: [prompts/install_codex_zh-TW.txt](prompts/install_codex_zh-TW.txt)
-
-### Install by shell
-
-```bash
-# Claude Code
-./scripts/install_skill.sh claude
-
-# Codex
-./scripts/install_skill.sh codex
-```
-
-Or one-liner:
-
-```bash
-git clone https://github.com/soanseng/podcast-use.git && cd podcast-use && ./scripts/install_skill.sh claude
-```
-
-Restart the client after install.
-
-## Recommended workflow
-
-Put source audio in a folder, then ask Claude Code / Codex to use the `podcast-use` skill.
-
-Manual helper flow:
-
-```bash
 # 0) session tracker
-uv run helpers/init_status.py --edit-dir /path/to/edit
+uv run helpers/init_status.py --edit-dir "$EDIT"
 
 # 1) optional glossary for names / jargon
-uv run helpers/init_glossary.py --edit-dir /path/to/edit
-$EDITOR /path/to/edit/glossary.txt
+uv run helpers/init_glossary.py --edit-dir "$EDIT"
+$EDITOR "$EDIT/glossary.txt"
 
 # 2) transcribe (turbo default; use large-v3 for final accuracy)
-uv run helpers/transcribe_groq.py /path/to/audio.wav
-uv run helpers/transcribe_groq.py /path/to/audio.wav \
+uv run helpers/transcribe_groq.py "$AUDIO" --edit-dir "$EDIT"
+uv run helpers/transcribe_groq.py "$AUDIO" --edit-dir "$EDIT" \
   --model whisper-large-v3 \
-  --glossary /path/to/edit/glossary.txt \
+  --glossary "$EDIT/glossary.txt" \
   --force
 
 # 3) pack + analyze
-uv run helpers/pack_transcripts.py --edit-dir /path/to/edit
-uv run helpers/analyze_audio.py /path/to/audio.wav --edit-dir /path/to/edit
+uv run helpers/pack_transcripts.py --edit-dir "$EDIT"
+uv run helpers/analyze_audio.py "$AUDIO" --edit-dir "$EDIT"
 
-# 4) after the agent writes edl.draft.json
-uv run helpers/validate_edl.py --edit-dir /path/to/edit --edl /path/to/edit/edl.draft.json
-uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit \
-  --edl /path/to/edit/edl.draft.json --preview
+# 4) after writing edl.draft.json (or let the agent write it)
+uv run helpers/validate_edl.py --edit-dir "$EDIT" --edl "$EDIT/edl.draft.json"
+uv run helpers/render_audio.py "$AUDIO" --edit-dir "$EDIT" \
+  --edl "$EDIT/edl.draft.json" --preview
 
 # 5) approve + final
-uv run helpers/approve_edl.py --edit-dir /path/to/edit
-uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit
+uv run helpers/approve_edl.py --edit-dir "$EDIT"
+uv run helpers/render_audio.py "$AUDIO" --edit-dir "$EDIT"
 ```
 
-### Modes the skill should lock early
+### Packaging (only after the edit is locked)
 
-| Mode | Goal |
-|------|------|
-| `cleanup` | fillers, dead air, slips |
-| `shorten` | hit a shorter target length |
-| `clip` | extract stand-alone clips |
-| `takes` | choose best takes across files |
-| `review-only` | advice only, no render |
-| `publish` | full upload package after edit is locked |
+```bash
+uv run helpers/build_subtitles.py "$AUDIO" --edit-dir "$EDIT"
+uv run helpers/build_subtitles.py "$AUDIO" --edit-dir "$EDIT" --refine-groq
+
+uv run helpers/init_deliverables.py "$AUDIO" --edit-dir "$EDIT"
+
+uv run helpers/render_youtube_video.py "$AUDIO" \
+  --edit-dir "$EDIT" \
+  --image "$EDIT/cover.png" \
+  --burn-subtitles
+
+uv run helpers/init_reels_plan.py --edit-dir "$EDIT"
+uv run helpers/render_reels.py "$AUDIO" --edit-dir "$EDIT" --generate-images
+```
+
+---
 
 ## Edit directory layout
 
@@ -206,6 +301,8 @@ edit/
 - cuts should sit on word boundaries
 - write drafts to `edl.draft.json`, promote with `approve_edl.py`
 
+Resolution order when `--edl` is omitted: `edl.approved.json` → `edl.json` → `edl.draft.json`.
+
 ## Audio processing
 
 Default final chain (spoken-word oriented):
@@ -230,26 +327,9 @@ uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --onl
 uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-denoise --no-eq
 ```
 
-## Subtitles and packaging
+## Images
 
-```bash
-uv run helpers/build_subtitles.py /path/to/audio.wav --edit-dir /path/to/edit
-uv run helpers/build_subtitles.py /path/to/audio.wav --edit-dir /path/to/edit --refine-groq
-
-uv run helpers/init_deliverables.py /path/to/audio.wav --edit-dir /path/to/edit
-
-uv run helpers/render_youtube_video.py /path/to/audio.wav \
-  --edit-dir /path/to/edit \
-  --image /path/to/edit/cover.png \
-  --burn-subtitles
-
-uv run helpers/init_reels_plan.py --edit-dir /path/to/edit
-uv run helpers/render_reels.py /path/to/audio.wav --edit-dir /path/to/edit --generate-images
-```
-
-Image generation:
-
-- Prefer runtime built-in image tools when available (e.g. Codex)
+- Prefer runtime built-in image tools when available (e.g. Codex / Grok image tools)
 - Local default: OpenAI `gpt-image-2` via `helpers/generate_image.py`
 - Gemini remains an optional path
 

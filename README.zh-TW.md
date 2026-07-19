@@ -1,6 +1,6 @@
 # podcast-use
 
-以對話驅動的 podcast / spoken-word 剪輯 skill，適用於 Claude Code 與 Codex。
+以對話驅動的 podcast / spoken-word 剪輯 skill，適用於 **Grok**、**Claude Code** 與 **Codex**。
 
 [English README](README.md)
 
@@ -40,19 +40,137 @@
 - 贅詞 / 重講分析是啟發式，刪之前仍要判斷
 - 不是 DAW：不取代多軌混音、床樂編曲、複雜音效設計
 
-## 前置安裝
+---
 
-需要：
+## 快速開始：怎麼用
 
-- `ffmpeg` / `ffprobe`
-- Python `3.10+`
-- `uv`
-- 轉錄用 `GROQ_API_KEY`
+### 1. 一次性環境
+
+```bash
+git clone https://github.com/soanseng/podcast-use.git
+cd podcast-use
+uv sync
+cp .env.example .env
+# 在 .env 填入 GROQ_API_KEY
+```
+
+需要：`ffmpeg`、`ffprobe`、Python `3.10+`、`uv`、`GROQ_API_KEY`。
 
 可選：
 
-- 本地 OpenAI 生圖：`OPENAI_API_KEY`
-- Gemini 生圖：`GEMINI_API_KEY` 或 `GOOGLE_API_KEY`
+- `OPENAI_API_KEY`：本地生圖
+- `GEMINI_API_KEY` / `GOOGLE_API_KEY`：Gemini 生圖
+
+### 2. 安裝成 skill
+
+```bash
+# Grok
+./scripts/install_skill.sh grok
+
+# Claude Code
+./scripts/install_skill.sh claude
+
+# Codex
+./scripts/install_skill.sh codex
+```
+
+會把 repo symlink 到對應 skills 目錄，並執行 `uv sync`。
+
+| 客戶端 | 安裝路徑 |
+|--------|----------|
+| Grok | `~/.grok/skills/podcast-use` |
+| Claude Code | `~/.claude/skills/podcast-use` |
+| Codex | `~/.codex/skills/podcast-use` |
+
+安裝後請**重啟客戶端或開新 session**，skill 才會被載入。
+
+### 3. 準備音檔
+
+```text
+my-episode/
+└── episode.wav    # 也可用 .mp3 / .m4a / .flac
+```
+
+產出會寫進 `my-episode/edit/`。
+
+### 4. 用對話操作（建議）
+
+在音檔所在資料夾開 Grok / Claude Code / Codex，直接說：
+
+```text
+用 podcast-use。幫我清理這集 podcast：去贅字、去死空氣。
+/path/to/my-episode/episode.wav
+```
+
+其他常用說法：
+
+```text
+用 podcast-use 的 shorten 模式，壓到大約 25 分鐘。
+
+用 podcast-use，先 review-only：整理結構與剪輯建議，先不要渲染。
+
+用 podcast-use，從這集抽出 3 段適合 Shorts 的精華。
+
+剪輯鎖定後，用 podcast-use 的 publish 模式做上架包。
+```
+
+Grok 若已安裝 skill，也可直接用 slash command：`/podcast-use`。
+
+### 5. 典型對話流程
+
+1. **鎖定模式** — cleanup / shorten / clip / takes / review-only / publish
+2. **Glossary** — 可選，補人名、品牌、專有名詞
+3. **轉錄 + 打包 + 分析**
+4. **剪輯提案** — 安全 / 可選 / 有風險 + 預估時長
+5. **你選一檔方案**
+6. Agent 寫 `edit/edl.draft.json`
+7. **驗證 + preview**（`edit/preview.mp3`）
+8. 你聽過後給修改意見
+9. **批准 EDL → final**（`edit/final.mp3`）
+10. 可選包裝：字幕、封面、YouTube 影片、reels、show notes
+
+**不要跳過批准。** Final 音訊應來自 approved EDL。
+
+### 模式一覽
+
+| 模式 | 用途 | 典型產出 |
+|------|------|----------|
+| `cleanup` | 去贅字、死空氣、口誤 | `final.mp3` |
+| `shorten` | 壓長度、去離題 | `final.mp3` + 刪減說明 |
+| `clip` | 抽精華 | clip 音訊（可加字幕） |
+| `takes` | 多 take 選句 | 合併 EDL + `final.mp3` |
+| `review-only` | 只給建議 | 分析報告，不渲染 |
+| `publish` | 剪輯鎖定後上架 | 音訊 + 字幕 + 影片/reels/文案 |
+
+---
+
+## 安裝細節
+
+### 用聊天安裝
+
+把對應 prompt 貼給 agent：
+
+- Grok 英文：[prompts/install_grok_en.txt](prompts/install_grok_en.txt)
+- Grok 繁中：[prompts/install_grok_zh-TW.txt](prompts/install_grok_zh-TW.txt)
+- Claude Code 英文：[prompts/install_claude_code_en.txt](prompts/install_claude_code_en.txt)
+- Claude Code 繁中：[prompts/install_claude_code_zh-TW.txt](prompts/install_claude_code_zh-TW.txt)
+- Codex 英文：[prompts/install_codex_en.txt](prompts/install_codex_en.txt)
+- Codex 繁中：[prompts/install_codex_zh-TW.txt](prompts/install_codex_zh-TW.txt)
+
+### 手動安裝
+
+```bash
+# Grok
+ln -sfn "$(pwd)" ~/.grok/skills/podcast-use
+
+# Claude Code
+ln -sfn "$(pwd)" ~/.claude/skills/podcast-use
+
+# Codex
+ln -sfn "$(pwd)" "${CODEX_HOME:-$HOME/.codex}/skills/podcast-use"
+```
+
+### 系統套件
 
 Ubuntu / Debian：
 
@@ -68,78 +186,62 @@ macOS：
 brew install ffmpeg python uv
 ```
 
-接著：
+---
+
+## 手動 helper 流程
+
+想自己跑指令、或想知道 skill 背後做了什麼時：
 
 ```bash
-git clone https://github.com/soanseng/podcast-use.git
-cd podcast-use
-uv sync
-cp .env.example .env
-```
+AUDIO=/path/to/episode.wav
+EDIT=/path/to/edit          # 通常是 <audio_dir>/edit
 
-## 一鍵安裝成 skill
-
-### 用聊天安裝
-
-- Claude Code 英文：[prompts/install_claude_code_en.txt](prompts/install_claude_code_en.txt)
-- Claude Code 繁中：[prompts/install_claude_code_zh-TW.txt](prompts/install_claude_code_zh-TW.txt)
-- Codex 英文：[prompts/install_codex_en.txt](prompts/install_codex_en.txt)
-- Codex 繁中：[prompts/install_codex_zh-TW.txt](prompts/install_codex_zh-TW.txt)
-
-### 用 shell 安裝
-
-```bash
-./scripts/install_skill.sh claude   # Claude Code
-./scripts/install_skill.sh codex    # Codex
-```
-
-安裝後重啟對應客戶端。
-
-## 建議工作流
-
-把音檔放進資料夾，然後請 Claude Code / Codex 使用 `podcast-use` skill。
-
-手動 helper 流程：
-
-```bash
 # 0) 狀態檔
-uv run helpers/init_status.py --edit-dir /path/to/edit
+uv run helpers/init_status.py --edit-dir "$EDIT"
 
 # 1) 專有名詞 glossary（建議）
-uv run helpers/init_glossary.py --edit-dir /path/to/edit
-$EDITOR /path/to/edit/glossary.txt
+uv run helpers/init_glossary.py --edit-dir "$EDIT"
+$EDITOR "$EDIT/glossary.txt"
 
 # 2) 轉錄（預設 turbo；定稿可用 large-v3 + glossary）
-uv run helpers/transcribe_groq.py /path/to/audio.wav
-uv run helpers/transcribe_groq.py /path/to/audio.wav \
+uv run helpers/transcribe_groq.py "$AUDIO" --edit-dir "$EDIT"
+uv run helpers/transcribe_groq.py "$AUDIO" --edit-dir "$EDIT" \
   --model whisper-large-v3 \
-  --glossary /path/to/edit/glossary.txt \
+  --glossary "$EDIT/glossary.txt" \
   --force
 
 # 3) 打包 + 分析
-uv run helpers/pack_transcripts.py --edit-dir /path/to/edit
-uv run helpers/analyze_audio.py /path/to/audio.wav --edit-dir /path/to/edit
+uv run helpers/pack_transcripts.py --edit-dir "$EDIT"
+uv run helpers/analyze_audio.py "$AUDIO" --edit-dir "$EDIT"
 
-# 4) agent 寫好 edl.draft.json 後
-uv run helpers/validate_edl.py --edit-dir /path/to/edit --edl /path/to/edit/edl.draft.json
-uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit \
-  --edl /path/to/edit/edl.draft.json --preview
+# 4) 寫好 edl.draft.json 後
+uv run helpers/validate_edl.py --edit-dir "$EDIT" --edl "$EDIT/edl.draft.json"
+uv run helpers/render_audio.py "$AUDIO" --edit-dir "$EDIT" \
+  --edl "$EDIT/edl.draft.json" --preview
 
 # 5) 批准 + final
-uv run helpers/approve_edl.py --edit-dir /path/to/edit
-uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit
+uv run helpers/approve_edl.py --edit-dir "$EDIT"
+uv run helpers/render_audio.py "$AUDIO" --edit-dir "$EDIT"
 ```
 
-### 模式
+### 發佈包（剪輯鎖定後再做）
 
-| 模式 | 用途 |
-|------|------|
-| `cleanup` | 去贅字、死空氣、口誤 |
-| `shorten` | 壓長度、去離題 |
-| `clip` | 抽精華片段 |
-| `takes` | 多 take 選句 |
-| `review-only` | 只給建議，不渲染 |
-| `publish` | 剪輯鎖定後做完整上架包 |
+```bash
+uv run helpers/build_subtitles.py "$AUDIO" --edit-dir "$EDIT"
+uv run helpers/build_subtitles.py "$AUDIO" --edit-dir "$EDIT" --refine-groq
+
+uv run helpers/init_deliverables.py "$AUDIO" --edit-dir "$EDIT"
+
+uv run helpers/render_youtube_video.py "$AUDIO" \
+  --edit-dir "$EDIT" \
+  --image "$EDIT/cover.png" \
+  --burn-subtitles
+
+uv run helpers/init_reels_plan.py --edit-dir "$EDIT"
+uv run helpers/render_reels.py "$AUDIO" --edit-dir "$EDIT" --generate-images
+```
+
+---
 
 ## 目錄結構
 
@@ -179,6 +281,7 @@ edit/
 - draft 寫入 `edl.draft.json`
 - 使用者確認後用 `approve_edl.py` 晉升
 - final render 應使用 approved EDL
+- 未指定 `--edl` 時解析順序：`edl.approved.json` → `edl.json` → `edl.draft.json`
 
 ## 聲音工程
 
@@ -201,27 +304,9 @@ uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --edg
 uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --no-denoise --no-eq
 ```
 
-## 字幕與發佈
+## 圖片
 
-```bash
-uv run helpers/build_subtitles.py /path/to/audio.wav --edit-dir /path/to/edit
-uv run helpers/build_subtitles.py /path/to/audio.wav --edit-dir /path/to/edit --refine-groq
-
-uv run helpers/init_deliverables.py /path/to/audio.wav --edit-dir /path/to/edit
-uv run helpers/render_youtube_video.py /path/to/audio.wav \
-  --edit-dir /path/to/edit \
-  --image /path/to/edit/cover.png \
-  --burn-subtitles
-
-uv run helpers/init_reels_plan.py --edit-dir /path/to/edit
-uv run helpers/render_reels.py /path/to/audio.wav --edit-dir /path/to/edit --generate-images
-```
-
-字幕精煉規則：不改 cue 數量與時間碼，只修文字；繁中專案優先 zh-Hant；人名品牌跟 glossary。
-
-圖片：
-
-- 有 runtime 內建生圖（如 Codex）時優先用
+- 有 runtime 內建生圖（如 Codex / Grok image tools）時優先用
 - 本地 helper 預設 OpenAI `gpt-image-2`
 - Gemini 為選配
 

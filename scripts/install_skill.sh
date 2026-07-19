@@ -14,8 +14,12 @@ case "$TARGET" in
     DEST_DIR="${CODEX_HOME:-${HOME}/.codex}/skills"
     DEST_LINK="${DEST_DIR}/podcast-use"
     ;;
+  grok)
+    DEST_DIR="${GROK_HOME:-${HOME}/.grok}/skills"
+    DEST_LINK="${DEST_DIR}/podcast-use"
+    ;;
   *)
-    echo "usage: $0 [claude|codex]" >&2
+    echo "usage: $0 [claude|codex|grok]" >&2
     exit 1
     ;;
 esac
@@ -33,5 +37,5 @@ else
   exit 1
 fi
 
-echo "installed: $DEST_LINK"
-echo "restart your client to pick up the skill"
+echo "installed: $DEST_LINK -> $ROOT"
+echo "restart your client (or start a new session) to pick up the skill"
