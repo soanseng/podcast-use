@@ -105,6 +105,21 @@ def extract_json_object(text: str) -> dict:
         return json.loads(stripped[start : end + 1])
 
 
+def reasoning_fallbacks(reasoning_effort: str | None, message: str) -> list[str]:
+    """Effort values worth retrying after the provider rejects the requested one.
+
+    Vocabularies differ: commandcode spells "no thinking" as "off". Dropping the
+    parameter instead makes thinking models burn their whole budget on reasoning,
+    so fall back to the cheapest effort they do accept first.
+    """
+    fallbacks: list[str] = []
+    if reasoning_effort == "none" and "expected one of" in message and '"off"' in message:
+        fallbacks.append("off")
+    if reasoning_effort != "low":
+        fallbacks.append("low")
+    return fallbacks
+
+
 def chat_json(
     client: OpenAI,
     model: str,
@@ -170,11 +185,11 @@ def chat_json(
             response = call(False)
         elif "reasoning_effort" in message or "reasoning" in message:
             response = None
-            if reasoning_effort == "none" and "expected one of" in message and '"off"' in message:
-                # commandcode-style vocabulary: none is spelled "off"
+            for effort in reasoning_fallbacks(reasoning_effort, message):
                 try:
-                    response = call(json_mode, reasoning_override="off")
-                except Exception:  # noqa: BLE001 - model may not support disabling either
+                    response = call(json_mode, reasoning_override=effort)
+                    break
+                except Exception:  # noqa: BLE001 - model may not support this effort either
                     response = None
             if response is None:
                 response = call(json_mode, include_reasoning=False)

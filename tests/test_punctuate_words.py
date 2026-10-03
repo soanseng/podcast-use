@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+import sys
+
 import pytest
 
 from punctuate_words_local import apply_marks, punctuate_batch
@@ -80,3 +83,83 @@ def test_punctuate_batch_retries_on_invalid_list() -> None:
     with pytest.raises(RuntimeError):
         punctuate_batch(client, "m", words, json_mode=False, disable_thinking=True, max_tokens=512)
     assert len(client.completions.calls) == 3
+
+
+class _ScriptedCompletions:
+    """Client that returns scripted payloads (or raises scripted errors) per call."""
+
+    def __init__(self, script: list[object]) -> None:
+        self.script = list(script)
+        self.calls: list[dict] = []
+
+    def create(self, **kwargs: object) -> object:
+        self.calls.append(kwargs)
+        item = self.script.pop(0)
+        if isinstance(item, Exception):
+            raise item
+        return _Response(str(item))
+
+
+class _ScriptedClient:
+    def __init__(self, script: list[object]) -> None:
+        completions = _ScriptedCompletions(script)
+        self.completions = completions
+        self.chat = type("Chat", (), {"completions": completions})()
+
+
+def _patch_local_llm(monkeypatch, client: object) -> None:
+    import punctuate_words_local as pwl
+
+    monkeypatch.setattr(pwl.local_llm, "make_refine_client", lambda **kwargs: client)
+    monkeypatch.setattr(pwl.local_llm, "refine_model", lambda: "m")
+    monkeypatch.setattr(pwl.local_llm, "thinking_toggle_supported", lambda *a, **k: False)
+    monkeypatch.setattr(pwl.local_llm, "refine_reasoning", lambda *a, **k: "low")
+
+
+def test_main_keeps_word_order_with_parallel_batches(monkeypatch, sample_edit) -> None:
+    import punctuate_words_local as pwl
+
+    client = _Client('{"punct":[{"i":0,"p":"，"}]}')
+    _patch_local_llm(monkeypatch, client)
+    transcript = sample_edit / "transcripts" / "episode.json"
+    monkeypatch.setattr(
+        sys, "argv",
+        ["punctuate", str(transcript), "--batch-words", "2", "--concurrency", "3"],
+    )
+    pwl.main()
+
+    payload = json.loads((sample_edit / "transcripts" / "episode.punct.json").read_text())
+    # Each of the 3 batches marks its own first word; order must survive the pool.
+    assert [w["word"] for w in payload["words"]] == ["Hello，", "world", "this，", "is", "a，", "test"]
+    assert payload["punctuated_by"] == "m"
+    assert len(client.completions.calls) == 3
+    assert not (sample_edit / "transcripts" / "episode.punct.partial.json").exists()
+
+
+def test_main_resumes_from_prefix_checkpoint(monkeypatch, sample_edit) -> None:
+    import punctuate_words_local as pwl
+
+    transcript = sample_edit / "transcripts" / "episode.json"
+    partial = sample_edit / "transcripts" / "episode.punct.partial.json"
+    marks = '{"punct":[{"i":0,"p":"，"}]}'
+    down = RuntimeError("upstream down")
+    failing = _ScriptedClient([marks, marks, down, down, down])
+    _patch_local_llm(monkeypatch, failing)
+    monkeypatch.setattr(
+        sys, "argv", ["punctuate", str(transcript), "--batch-words", "2", "--concurrency", "1"]
+    )
+    with pytest.raises(RuntimeError):
+        pwl.main()
+
+    # The checkpoint must stay a contiguous prefix so a resume cannot duplicate or drop words.
+    checkpoint = json.loads(partial.read_text())
+    assert [w["word"] for w in checkpoint["words"]] == ["Hello，", "world", "this，", "is"]
+
+    resuming = _Client('{"punct":[{"i":0,"p":"。"}]}')
+    _patch_local_llm(monkeypatch, resuming)
+    pwl.main()
+
+    payload = json.loads((sample_edit / "transcripts" / "episode.punct.json").read_text())
+    assert [w["word"] for w in payload["words"]] == ["Hello，", "world", "this，", "is", "a。", "test"]
+    assert resuming.completions.calls[0]["messages"][1]["content"].count('"a"') == 1
+    assert not partial.exists()

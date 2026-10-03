@@ -61,6 +61,15 @@ punctuation with exact word timestamps. `build_subtitles.py` also breaks at sile
 (`--max-gap`, default 0.35 s) and a duration cap (`--max-cue-seconds`, default 3.5 s); CJK tokens
 are joined without spaces.
 
+Cloud providers (commandcode etc.): thinking models reason on every request, and reasoning tokens grow
+faster than the batch does — raising `--batch-words` to 600 measured 4x the latency for 1.5x the marks,
+and 1200 words overflowed the completion budget outright. Keep batches at 300 and raise `--concurrency`
+instead (default 4 in-flight calls; 4 batches measured 1.4x faster under heavy provider throttling,
+3.5x when the provider is lightly loaded — it throttles per account, so the gain is bounded). Some models cannot
+disable thinking at all (`z-ai/glm-5.3-flash` rejects both `none` and `off`); a rejected
+`reasoning_effort` falls back to the cheapest effort the provider accepts rather than being dropped —
+dropping it makes the model think and burn the whole budget on reasoning.
+
 ## Metadata guidance
 
 ### `show_notes.md`

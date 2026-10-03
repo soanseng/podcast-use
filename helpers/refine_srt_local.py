@@ -89,7 +89,7 @@ def main() -> None:
     parser.add_argument(
         "--reasoning",
         default=None,
-        choices=["none", "low", "medium", "high", "max"],
+        choices=["none", "off", "low", "medium", "high", "xhigh", "max"],
         help="reasoning_effort for cloud models. Default: none (PODCAST_REFINE_REASONING overrides)",
     )
     parser.add_argument(

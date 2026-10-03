@@ -244,3 +244,45 @@ def test_chat_json_drops_reasoning_on_rejection() -> None:
     )
     assert payload == {"ok": True}
     assert "reasoning_effort" not in client.completions.calls[1]
+
+
+def test_reasoning_fallbacks_prefer_off_then_low() -> None:
+    from refine_srt_groq import reasoning_fallbacks
+
+    vocab = (
+        'Error code: 400 - {\'error\': {\'message\': \'Invalid option: expected one of '
+        '"off"|"low"|"medium"|"high"|"xhigh"|"max"\', \'type\': \'invalid_request_error\', '
+        "\'param\': \'reasoning_effort\'}}"
+    )
+    assert reasoning_fallbacks("none", vocab) == ["off", "low"]
+    assert reasoning_fallbacks("none", "Unsupported parameter: reasoning_effort") == ["low"]
+    assert reasoning_fallbacks("low", vocab) == []
+
+
+def test_chat_json_retries_low_when_thinking_cannot_be_disabled() -> None:
+    from refine_srt_groq import chat_json
+
+    # glm-5.3-flash rejects both the commandcode vocabulary value and "off" itself;
+    # dropping the parameter would let it think and burn the whole budget, so the
+    # cheapest accepted effort has to win.
+    client = _Client(
+        [
+            ValueError(
+                'Error code: 400 - {\'error\': {\'message\': \'Invalid option: expected one of '
+                '"off"|"low"|"medium"|"high"|"xhigh"|"max"\', \'type\': \'invalid_request_error\', '
+                "\'param\': \'reasoning_effort\'}}"
+            ),
+            ValueError('Model "z-ai/glm-5.3-flash" does not support reasoning_effort "off".'),
+            _Response('{"ok":true}'),
+        ]
+    )
+    payload = chat_json(
+        client,
+        "z-ai/glm-5.3-flash",
+        [{"role": "user", "content": "x"}],
+        json_mode=False,
+        reasoning_effort="none",
+    )
+    assert payload == {"ok": True}
+    assert client.completions.calls[1]["reasoning_effort"] == "off"
+    assert client.completions.calls[2]["reasoning_effort"] == "low"

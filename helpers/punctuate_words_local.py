@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import local_llm
@@ -119,7 +120,7 @@ def main() -> None:
     parser.add_argument(
         "--reasoning",
         default=None,
-        choices=["none", "low", "medium", "high", "max"],
+        choices=["none", "off", "low", "medium", "high", "xhigh", "max"],
         help="reasoning_effort for cloud models. Default: none (PODCAST_REFINE_REASONING overrides)",
     )
     parser.add_argument(
@@ -131,7 +132,15 @@ def main() -> None:
         "--batch-words",
         type=int,
         default=300,
-        help="Tokens per model call (default: 300)",
+        help="Tokens per model call (default: 300). Keep it: cloud models reason per call "
+        "and reasoning tokens grow faster than the batch (600 words = 4x latency)",
+    )
+    parser.add_argument(
+        "--concurrency",
+        type=int,
+        default=4,
+        help="Model calls in flight at once (default: 4). Provider throttling caps the gain: "
+        "measured 1.4x-3.5x",
     )
     parser.add_argument(
         "--json-mode",
@@ -180,23 +189,45 @@ def main() -> None:
     model = args.model or local_llm.refine_model()
     batch_words = max(1, args.batch_words)
     max_tokens = args.max_tokens or max(4096, batch_words // 2)
+    disable_thinking = not args.thinking and local_llm.thinking_toggle_supported(args.base_url)
+    reasoning_effort = args.reasoning or local_llm.refine_reasoning(args.base_url)
     remaining = words[len(punctuated) :]
-    total_batches = (len(remaining) + batch_words - 1) // batch_words
-    for number, start in enumerate(range(0, len(remaining), batch_words), start=1):
-        batch = remaining[start : start + batch_words]
-        punctuated.extend(
-            punctuate_batch(
-                client,
-                model,
-                batch,
-                json_mode=args.json_mode,
-                disable_thinking=not args.thinking and local_llm.thinking_toggle_supported(args.base_url),
-                max_tokens=max_tokens,
-                reasoning_effort=args.reasoning or local_llm.refine_reasoning(args.base_url),
-            )
+    batches = [
+        remaining[start : start + batch_words] for start in range(0, len(remaining), batch_words)
+    ]
+    total_batches = len(batches)
+
+    def run_batch(batch: list[dict]) -> list[dict]:
+        return punctuate_batch(
+            client,
+            model,
+            batch,
+            json_mode=args.json_mode,
+            disable_thinking=disable_thinking,
+            max_tokens=max_tokens,
+            reasoning_effort=reasoning_effort,
         )
-        write_partial(partial_path, payload, punctuated)
-        print(f"batch {number}/{total_batches}: {len(punctuated)}/{len(words)} words", file=sys.stderr)
+
+    # Batches are independent; each one is slow only because cloud models think. Run
+    # several at once and keep the checkpoint a contiguous prefix so resume still works.
+    completed: list[list[dict] | None] = [None] * total_batches
+    with ThreadPoolExecutor(max_workers=max(1, args.concurrency)) as pool:
+        futures = {pool.submit(run_batch, batch): index for index, batch in enumerate(batches)}
+        for count, future in enumerate(as_completed(futures), start=1):
+            completed[futures[future]] = future.result()
+            prefix: list[dict] = []
+            for part in completed:
+                if part is None:
+                    break
+                prefix.extend(part)
+            write_partial(partial_path, payload, punctuated + prefix)
+            print(
+                f"batch {count}/{total_batches}: {len(punctuated) + len(prefix)}/{len(words)} words",
+                file=sys.stderr,
+            )
+
+    for part in completed:
+        punctuated.extend(part or [])
 
     payload["words"] = punctuated
     payload["punctuated_by"] = model
