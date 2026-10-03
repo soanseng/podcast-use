@@ -130,7 +130,7 @@ Grok 若已安裝 skill，也可直接用 slash command：`/podcast-use`。
 7. **驗證 + preview**（`edit/preview.mp3`）
 8. 你聽過後給修改意見
 9. **批准 EDL → final**（`edit/final.mp3`）
-10. 可選包裝：字幕、封面、YouTube 影片、reels、show notes
+10. 可選包裝：字幕、封面、YouTube 影片、reels、show notes、社群貼文（FB 約 2000 字、Threads/X 500 字內）
 
 **不要跳過批准。** Final 音訊應來自 approved EDL。
 
@@ -273,6 +273,8 @@ edit/
 ├── show_notes.md
 ├── timestamps.txt
 ├── youtube_description.md
+├── facebook_post.md
+├── threads_post.md
 └── reels/
 ```
 

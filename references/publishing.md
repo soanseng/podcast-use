@@ -11,6 +11,8 @@ Use only in `publish` mode or when the user explicitly asks for upload assets.
 - `show_notes.md`
 - `timestamps.txt`
 - `youtube_description.md`
+- `facebook_post.md` (~2000 chars, on request)
+- `threads_post.md` (<=500 chars, on request)
 
 ## Order
 
@@ -20,6 +22,7 @@ Use only in `publish` mode or when the user explicitly asks for upload assets.
 4. YouTube video
 5. Reel candidates → user selection → render
 6. Metadata files
+7. Social posts: `facebook_post.md` (~2000 chars), `threads_post.md` (<=500 chars)
 
 ## Subtitles
 
@@ -90,6 +93,21 @@ dropping it makes the model think and burn the whole budget on reasoning.
 2. Short summary
 3. Timestamps
 4. Links / CTAs (placeholders OK; do not invent)
+
+### `facebook_post.md`
+
+- ~2000 characters (1800-2200), episode language
+- First line must stand alone in feed preview
+- Story-first: one thread of argument from the episode, not a summary dump
+- 3-5 takeaways (timestamps optional), ends with one audience question + listen link placeholder
+- No fabricated quotes
+
+### `threads_post.md`
+
+- <=500 characters including spaces, hashtags, and link — count the draft text only
+- One idea only: the strongest hook from the episode
+- 1-3 hashtags max; link placeholder at the end
+- X free tier caps at 280 characters: keep a trimmed variant if the same post targets X
 
 ```bash
 uv run helpers/init_deliverables.py /path/to/audio.wav --edit-dir /path/to/edit

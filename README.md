@@ -128,7 +128,7 @@ You can also invoke it as a slash command in Grok when the skill is installed: `
 7. **Validate + preview** (`edit/preview.mp3`)
 8. You listen and request changes if needed
 9. **Approve EDL → final render** (`edit/final.mp3`)
-10. Optional packaging: subtitles, covers, YouTube video, reels, show notes
+10. Optional packaging: subtitles, covers, YouTube video, reels, show notes, social posts (Facebook ~2000 chars, Threads/X <=500 chars)
 
 **Do not skip approval.** Final audio should come from an approved EDL.
 
@@ -284,6 +284,8 @@ edit/
 ├── show_notes.md
 ├── timestamps.txt
 ├── youtube_description.md
+├── facebook_post.md
+├── threads_post.md
 ├── cover_prompt.md
 ├── podcast_cover_prompt.md
 ├── reels_plan.json

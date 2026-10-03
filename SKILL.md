@@ -212,6 +212,7 @@ Only when mode is `publish` or user asks. Order:
 4. YouTube static video
 5. Reels candidates → user pick → render
 6. `show_notes.md`, `timestamps.txt`, `youtube_description.md`
+7. Social posts: `facebook_post.md` (~2000 chars), `threads_post.md` (<=500 chars)
 
 ```bash
 # word-level punctuation pass first (cues then break on punctuation, exact timings):
@@ -253,6 +254,8 @@ source_dir/
     ├── show_notes.md
     ├── timestamps.txt
     ├── youtube_description.md
+    ├── facebook_post.md
+    ├── threads_post.md
     ├── cover_prompt.md
     ├── podcast_cover_prompt.md
     ├── reels_plan.json

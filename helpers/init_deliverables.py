@@ -59,6 +59,34 @@ TODO
 
 Avoid clutter, unreadable tiny text, distorted faces, extra fingers, low contrast typography.
 """,
+    "facebook_post.md": """# Facebook Post
+
+Target: ~2000 characters (1800-2200) in the episode's language.
+
+## Structure
+
+1. Hook line (stands alone in feed preview)
+2. Why this episode matters
+3. 3-5 key takeaways or moments (rough timestamps optional)
+4. One question to the audience
+5. CTA: listen link placeholder
+
+## Draft
+
+TODO
+""",
+    "threads_post.md": """# Threads / X Post
+
+Hard limit: 500 characters including spaces and hashtags. One idea only.
+
+- Strongest hook from the episode, plain language
+- 1-3 hashtags max
+- Listen link placeholder at the end
+
+## Draft
+
+TODO
+""",
 }
 
 
