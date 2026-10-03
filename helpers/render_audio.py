@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
-from edl_io import effective_range, load_segments, resolve_edl_path
+from edl_io import effective_range, load_segments, resolve_edl_path, segment_duration
 
 
 def run(cmd: list[str]) -> None:
@@ -88,17 +89,102 @@ def probe_duration(audio_path: Path) -> float | None:
         return None
 
 
+def probe_audio_format(audio_path: Path) -> tuple[int, int]:
+    result = subprocess.run(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-select_streams",
+            "a:0",
+            "-show_entries",
+            "stream=sample_rate,channels",
+            "-of",
+            "json",
+            str(audio_path),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    try:
+        stream = json.loads(result.stdout)["streams"][0]
+        return int(stream["sample_rate"]), int(stream["channels"])
+    except (KeyError, IndexError, ValueError):
+        return 44100, 1
+
+
+def build_atempo(speed: float) -> list[str]:
+    """Split a tempo factor into ffmpeg stages that each stay within 0.5..2.0."""
+    if abs(speed - 1.0) < 1e-9:
+        return []
+    stages: list[str] = []
+    remaining = speed
+    while remaining > 2.0 + 1e-9:
+        stages.append("atempo=2.0")
+        remaining /= 2.0
+    while remaining < 0.5 - 1e-9:
+        stages.append("atempo=0.5")
+        remaining /= 0.5
+    stages.append(f"atempo={remaining:.6f}")
+    return stages
+
+
+def segment_filter_chain(segment: dict, output_duration: float) -> str:
+    """Declick, tempo, gain, and fades for one segment (Audacity-style ops)."""
+    filters = [
+        "afade=t=in:st=0:d=0.03",
+        "areverse",
+        "afade=t=in:st=0:d=0.03",
+        "areverse",
+    ]
+    filters.extend(build_atempo(float(segment.get("speed", 1.0) or 1.0)))
+    gain_db = float(segment.get("gain_db", 0.0) or 0.0)
+    if abs(gain_db) > 1e-9:
+        filters.append(f"volume={gain_db}dB")
+    fade_in = float(segment.get("fade_in", 0.0) or 0.0)
+    fade_out = float(segment.get("fade_out", 0.0) or 0.0)
+    if fade_in > 0:
+        filters.append(f"afade=t=in:st=0:d={fade_in:.3f}")
+    if fade_out > 0:
+        filters.append(f"afade=t=out:st={max(0.0, output_duration - fade_out):.3f}:d={fade_out:.3f}")
+    return ",".join(filters)
+
+
 def render_segments(
     audio_map: dict[str, Path],
     tmp_dir: Path,
     segments: list[dict],
     *,
     edge_pad: float,
+    sample_rate: int,
+    channels: int,
+    source_durations: dict[str, float] | None = None,
 ) -> list[Path]:
     rendered: list[Path] = []
-    durations: dict[str, float | None] = {}
+    durations: dict[str, float | None] = dict(source_durations or {})
+    common_output = ["-ar", str(sample_rate), "-ac", str(channels), "-c:a", "pcm_s16le"]
     for index, segment in enumerate(segments):
         out_path = tmp_dir / f"part_{index:04d}.wav"
+        if segment.get("is_silence"):
+            duration = segment_duration(segment)
+            layout = "mono" if channels == 1 else "stereo"
+            run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-f",
+                    "lavfi",
+                    "-i",
+                    f"anullsrc=r={sample_rate}:cl={layout}",
+                    "-t",
+                    f"{duration:.3f}",
+                    *common_output,
+                    str(out_path),
+                ]
+            )
+            rendered.append(out_path)
+            continue
         audio_path = audio_map[segment["source"]]
         if segment["source"] not in durations:
             durations[segment["source"]] = probe_duration(audio_path)
@@ -107,17 +193,19 @@ def render_segments(
             edge_pad=edge_pad,
             source_duration=durations[segment["source"]],
         )
+        speed = max(float(segment.get("speed", 1.0) or 1.0), 1e-6)
         cmd = [
             "ffmpeg",
             "-y",
-            "-i",
-            str(audio_path),
             "-ss",
             f"{start:.3f}",
             "-to",
             f"{end:.3f}",
+            "-i",
+            str(audio_path),
             "-af",
-            "afade=t=in:st=0:d=0.03,areverse,afade=t=in:st=0:d=0.03,areverse",
+            segment_filter_chain(segment, (end - start) / speed),
+            *common_output,
             str(out_path),
         ]
         run(cmd)
@@ -287,8 +375,19 @@ def main() -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     audio_map = {path.stem: path for path in audio_paths}
+    source_durations = {
+        stem: duration
+        for stem, path in audio_map.items()
+        if (duration := probe_duration(path)) is not None
+    }
+    sample_rate, channels = probe_audio_format(audio_paths[0])
     edl_path = resolve_edl_path(edit_dir, args.edl)
-    _, segments = load_segments(edit_dir, set(audio_map), edl_path=edl_path)
+    _, segments = load_segments(
+        edit_dir,
+        set(audio_map),
+        edl_path=edl_path,
+        source_durations=source_durations,
+    )
 
     if args.only_segment is not None:
         if args.only_segment < 0 or args.only_segment >= len(segments):
@@ -321,7 +420,15 @@ def main() -> None:
 
     with tempfile.TemporaryDirectory() as tmp:
         tmp_dir = Path(tmp)
-        parts = render_segments(audio_map, tmp_dir, segments, edge_pad=edge_pad)
+        parts = render_segments(
+            audio_map,
+            tmp_dir,
+            segments,
+            edge_pad=edge_pad,
+            sample_rate=sample_rate,
+            channels=channels,
+            source_durations=source_durations,
+        )
         concat_segments(
             parts,
             output_path,

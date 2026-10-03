@@ -25,6 +25,9 @@ Use only in `publish` mode or when the user explicitly asks for upload assets.
 
 ```bash
 uv run helpers/build_subtitles.py /path/to/audio.wav --edit-dir /path/to/edit
+# local refinement (LiteLLM, qwen36-genesis):
+uv run helpers/build_subtitles.py /path/to/audio.wav --edit-dir /path/to/edit --refine-local
+# Groq refinement:
 uv run helpers/build_subtitles.py /path/to/audio.wav --edit-dir /path/to/edit --refine-groq
 ```
 
@@ -39,10 +42,24 @@ Refinement rules:
 Optional standalone refine:
 
 ```bash
+uv run helpers/refine_srt_local.py /path/to/edit/final.srt --edit-dir /path/to/edit
 uv run helpers/refine_srt_groq.py /path/to/edit/final.srt --edit-dir /path/to/edit
 ```
 
-Default helper models: `qwen/qwen3-32b` with fallback `openai/gpt-oss-120b`.
+Default models: local `qwen36-genesis` (`PODCAST_REFINE_MODEL`); Groq `qwen/qwen3-32b` with fallback `openai/gpt-oss-120b`.
+
+`refine_srt_local.py` sends `chat_template_kwargs.enable_thinking=false` by default (`--thinking` to allow
+reasoning) because qwen36-genesis otherwise spends its budget on `reasoning_content` and returns empty
+`content`. `response_format=json_object` is off by default (`--json-mode` to enable); both settings degrade
+automatically if the provider rejects them. Batch size auto-scales with episode length (80 cues per
+request, or 160 above ~700 cues) unless `--batch-size` is set explicitly; truncated completions are
+retried with a doubled budget.
+
+Cue breakpoints: run `punctuate_words_local.py` on the transcript before `build_subtitles.py` — the
+model appends punctuation at the word level (strict same-count/same-order contract), so cues break on
+punctuation with exact word timestamps. `build_subtitles.py` also breaks at silence gaps
+(`--max-gap`, default 0.35 s) and a duration cap (`--max-cue-seconds`, default 3.5 s); CJK tokens
+are joined without spaces.
 
 ## Metadata guidance
 

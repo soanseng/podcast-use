@@ -68,6 +68,8 @@ def validate(
     words_by_source: dict[str, list[dict]] = {}
 
     for index, seg in enumerate(segments):
+        if seg.get("is_silence"):
+            continue
         source = seg["source"]
         if source not in words_by_source:
             words_by_source[source] = load_words(edit_dir, source)
@@ -125,6 +127,8 @@ def validate(
     # Overlap check per source
     by_source: dict[str, list[tuple[int, dict]]] = {}
     for index, seg in enumerate(segments):
+        if seg.get("is_silence"):
+            continue
         by_source.setdefault(seg["source"], []).append((index, seg))
     for source, items in by_source.items():
         ordered = sorted(items, key=lambda pair: pair[1]["start"])
@@ -159,10 +163,23 @@ def validate(
     for index, seg in enumerate(segments):
         dur = segment_duration(seg, edge_pad=edge_pad)
         reason = f" — {seg['reason']}" if seg.get("reason") else ""
+        if seg.get("is_silence"):
+            print(f"  [{index:02d}] silence ({format_duration(dur)}){reason}")
+            continue
+        ops: list[str] = []
+        if seg.get("gain_db"):
+            ops.append(f"gain {seg['gain_db']:+.1f}dB")
+        if abs(float(seg.get("speed", 1.0) or 1.0) - 1.0) > 1e-9:
+            ops.append(f"speed {float(seg['speed']):.2f}x")
+        if seg.get("fade_in"):
+            ops.append(f"fade-in {seg['fade_in']:.2f}s")
+        if seg.get("fade_out"):
+            ops.append(f"fade-out {seg['fade_out']:.2f}s")
+        op_text = f" [{', '.join(ops)}]" if ops else ""
         print(
             f"  [{index:02d}] {seg['source']} "
             f"{format_clock(seg['start'])}-{format_clock(seg['end'])} "
-            f"({format_duration(dur)}){reason}"
+            f"({format_duration(dur)}){op_text}{reason}"
         )
 
     # Largest dropped gaps per source (helpful review surface)

@@ -17,6 +17,9 @@
 ## 這個 skill 可以做什麼
 
 - 用 Groq Whisper 轉錄（含 word timestamps，可快取）
+- 用本地台語 ASR（`breeze-asr-26-taigi`，走 LiteLLM proxy）轉錄，適合台語 / 華台混講
+- Audacity 式剪輯：gain、fade in/out、插入靜音、變速（speed）、remove 模式（刪除選取範圍）
+- 用本地 LLM（`qwen36-genesis`）校正字幕用字
 - 打包成適合閱讀與剪輯的 `takes_packed.md`
 - 分析靜音、贅詞候選、可能的重講片段
 - 讓 LLM 提出分級剪輯方案（安全 / 可選 / 有風險）
@@ -203,7 +206,11 @@ uv run helpers/init_status.py --edit-dir "$EDIT"
 uv run helpers/init_glossary.py --edit-dir "$EDIT"
 $EDITOR "$EDIT/glossary.txt"
 
-# 2) 轉錄（預設 turbo；定稿可用 large-v3 + glossary）
+# 2) 轉錄（本地台語 ASR，或 Groq Whisper）
+# 本地需在 .env 設 LITELLM_MASTER_KEY；模型預設 breeze-asr-26-taigi
+uv run helpers/transcribe_local.py "$AUDIO" --edit-dir "$EDIT" \
+  --glossary "$EDIT/glossary.txt"
+
 uv run helpers/transcribe_groq.py "$AUDIO" --edit-dir "$EDIT"
 uv run helpers/transcribe_groq.py "$AUDIO" --edit-dir "$EDIT" \
   --model whisper-large-v3 \
@@ -227,7 +234,11 @@ uv run helpers/render_audio.py "$AUDIO" --edit-dir "$EDIT"
 ### 發佈包（剪輯鎖定後再做）
 
 ```bash
+# 先做 word-level 標點 pass（字幕斷點對齊標點）：
+uv run helpers/punctuate_words_local.py "$EDIT/transcripts/episode.json"
+
 uv run helpers/build_subtitles.py "$AUDIO" --edit-dir "$EDIT"
+uv run helpers/build_subtitles.py "$AUDIO" --edit-dir "$EDIT" --refine-local
 uv run helpers/build_subtitles.py "$AUDIO" --edit-dir "$EDIT" --refine-groq
 
 uv run helpers/init_deliverables.py "$AUDIO" --edit-dir "$EDIT"
@@ -326,13 +337,16 @@ helpers/                 # 可執行工具
 |--------|------|
 | `init_status.py` | 建立 `STATUS.md` |
 | `init_glossary.py` | glossary 模板 |
-| `transcribe_groq.py` | 轉錄 |
+| `transcribe_groq.py` | 轉錄（Groq Whisper） |
+| `transcribe_local.py` | 台語 ASR（本地 LiteLLM） |
 | `pack_transcripts.py` | 打包 transcript + 統計 |
 | `analyze_audio.py` | 靜音 / 贅詞 / 重講提示 |
 | `validate_edl.py` | 驗證 EDL 與時長 |
 | `approve_edl.py` | draft → approved |
 | `render_audio.py` | preview / final 音訊 |
 | `build_subtitles.py` | 字幕 |
+| `refine_srt_local.py` | 字幕校正（本地 qwen36-genesis） |
+| `punctuate_words_local.py` | word-level 標點 pass（斷點對齊標點） |
 | `render_youtube_video.py` | YouTube 靜態影片 |
 | `render_reels.py` | 直式短影片 |
 | `generate_image.py` | 本地生圖 |

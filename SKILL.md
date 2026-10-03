@@ -79,8 +79,11 @@ Ask: single vs multi speaker, target length, cleanup vs restructure, publish or 
 
 ```bash
 uv run helpers/init_glossary.py --edit-dir /path/to/edit   # if needed
+# local Taigi/zh-Hant ASR (LiteLLM proxy; needs LITELLM_MASTER_KEY in .env):
+uv run helpers/transcribe_local.py /path/to/audio.wav --glossary /path/to/edit/glossary.txt
+# or Groq Whisper:
 uv run helpers/transcribe_groq.py /path/to/audio.wav
-# optional final pass:
+# optional high-accuracy Groq pass:
 uv run helpers/transcribe_groq.py /path/to/audio.wav --glossary /path/to/edit/glossary.txt --model whisper-large-v3 --force
 
 uv run helpers/pack_transcripts.py --edit-dir /path/to/edit
@@ -88,6 +91,20 @@ uv run helpers/analyze_audio.py /path/to/audio.wav --edit-dir /path/to/edit
 ```
 
 Default model: `whisper-large-v3-turbo`. Use `whisper-large-v3` when accuracy matters more.
+
+`transcribe_local.py` defaults to `breeze-asr-26-taigi` (override with `PODCAST_ASR_MODEL` or `--model`).
+It requests `verbose_json` with `timestamp_granularities=["word","segment"]`, which this proxy honors
+(verified: 344 words for a 90 s clip), and degrades the request only if the server rejects a parameter.
+Inputs over 48 MiB are transcoded to 16 kHz mono mp3 before upload; word timestamps stay word-level.
+`build_subtitles.py` requires `transcripts/<stem>.json['words']` to produce cues for a source;
+`validate_edl.py` only warns and skips word-boundary checks when words are missing.
+
+Cue breakpoints: run `punctuate_words_local.py` on the transcript first, so cues break on
+punctuation with exact word timings (no interpolation). `build_subtitles.py` additionally breaks
+at silence gaps (`--max-gap`, default 0.35 s) and a duration cap (`--max-cue-seconds`, default 3.5 s);
+`--max-words` (default 24) is only the hard cap. CJK tokens are joined without spaces.
+
+
 
 Primary reading surfaces:
 
@@ -145,6 +162,24 @@ Write `edit/edl.draft.json`:
 
 Optional per-segment pads: `pad_in`, `pad_out` (seconds).
 
+Optional per-segment ops (Audacity-style):
+
+| Field | Effect |
+|-------|--------|
+| `pad_in` / `pad_out` | Extra seconds around the cut |
+| `gain_db` | Segment gain, -60..30 |
+| `fade_in` / `fade_out` | Fades in output seconds |
+| `speed` | Tempo change, 0.25..4.0; subtitles are rescaled to match |
+| `{"silence": <seconds>}` | Insert silence as its own segment item |
+
+Whole-file remove mode (Audacity "delete selection" semantics):
+
+```json
+{"mode": "remove", "segments": [{"source": "episode", "start": 300.0, "end": 312.5}]}
+```
+
+`remove` keeps the complement of the listed ranges; everything else behaves the same.
+
 ```bash
 uv run helpers/validate_edl.py --edit-dir /path/to/edit --edl /path/to/edit/edl.draft.json
 uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit --edl /path/to/edit/edl.draft.json --preview
@@ -179,8 +214,13 @@ Only when mode is `publish` or user asks. Order:
 6. `show_notes.md`, `timestamps.txt`, `youtube_description.md`
 
 ```bash
+# word-level punctuation pass first (cues then break on punctuation, exact timings):
+uv run helpers/punctuate_words_local.py /path/to/edit/transcripts/episode.json
+
 uv run helpers/build_subtitles.py /path/to/audio.wav --edit-dir /path/to/edit
-# optional auto refine:
+# optional auto refine (local qwen36-genesis via LiteLLM):
+uv run helpers/build_subtitles.py /path/to/audio.wav --edit-dir /path/to/edit --refine-local
+# optional auto refine (Groq):
 uv run helpers/build_subtitles.py /path/to/audio.wav --edit-dir /path/to/edit --refine-groq
 ```
 
@@ -242,17 +282,35 @@ source_dir/
 | Helper | Purpose |
 |--------|---------|
 | `transcribe_groq.py` | ASR + word timestamps |
+| `transcribe_local.py` | Taigi ASR via local LiteLLM proxy |
 | `pack_transcripts.py` | Readable packed transcript |
 | `analyze_audio.py` | Silence / filler / retake hints |
 | `validate_edl.py` | Boundary + duration checks |
 | `approve_edl.py` | draft → approved |
 | `render_audio.py` | Preview/final audio from EDL |
 | `build_subtitles.py` | Output-timeline SRT |
-| `refine_srt_groq.py` | Optional SRT wording pass |
+| `refine_srt_groq.py` | Optional SRT wording pass (Groq) |
+| `refine_srt_local.py` | Optional SRT wording pass (local LiteLLM) |
+| `punctuate_words_local.py` | Word-level punctuation pass for punctuation-aligned cues |
 | `render_youtube_video.py` | Static-image MP4 |
-| `init_reels_plan.py` / `render_reels.py` | Shorts/reels |
 | `generate_image.py` | Local cover/reel images |
+| `generate_codex_image.py` | Cover/reel images via Codex CLI (ChatGPT login) |
 | `init_deliverables.py` | Metadata skeletons |
 | `init_glossary.py` / `init_status.py` | Session setup |
 
 Run any helper with `--help` for flags. Prefer that over inventing options.
+
+## Local model config
+
+`.env` (gitignored, never commit) drives the local LiteLLM endpoint used by
+`transcribe_local.py` and `refine_srt_local.py`:
+
+| Key | Default | Purpose |
+|-----|---------|---------|
+| `LITELLM_BASE_URL` | `http://100.102.183.27:4000/v1` | Proxy endpoint |
+| `LITELLM_MASTER_KEY` | — | Required proxy master key |
+| `PODCAST_ASR_MODEL` | `breeze-asr-26-taigi` | Taigi ASR model |
+| `PODCAST_REFINE_MODEL` | `qwen36-genesis` | Subtitle refinement model |
+
+Always call the proxy on `:4000` with the master key; the `:8001` api_base in the
+model metadata is proxy-internal routing only.

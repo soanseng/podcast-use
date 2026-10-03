@@ -105,6 +105,100 @@ def extract_json_object(text: str) -> dict:
         return json.loads(stripped[start : end + 1])
 
 
+def chat_json(
+    client: OpenAI,
+    model: str,
+    messages: list[dict],
+    *,
+    json_mode: bool = True,
+    disable_thinking: bool = False,
+    max_tokens: int | None = None,
+    reasoning_effort: str | None = None,
+) -> dict:
+    """Chat completion parsed as JSON, tolerant of provider quirks.
+
+    - drops response_format if the provider rejects it
+    - drops the llama.cpp thinking toggle if the provider rejects it
+    - drops reasoning_effort if the provider rejects it
+    - retries plain-mode with a bigger budget on empty or truncated completions
+    - retries once more with a doubled budget when JSON parsing still fails
+    """
+
+    def call(
+        use_json_mode: bool,
+        token_budget: int | None = None,
+        disable_reasoning: bool | None = None,
+        include_reasoning: bool = True,
+        reasoning_override: str | None = None,
+    ) -> object:
+        kwargs: dict = {
+            "model": model,
+            "messages": messages,
+            "temperature": 0.0,
+        }
+        budget = token_budget if token_budget is not None else max_tokens
+        if budget:
+            kwargs["max_tokens"] = budget
+        if use_json_mode:
+            kwargs["response_format"] = {"type": "json_object"}
+        reasoning_off = disable_thinking if disable_reasoning is None else disable_reasoning
+        if reasoning_off:
+            kwargs["extra_body"] = {"chat_template_kwargs": {"enable_thinking": False}}
+        effort = reasoning_override or reasoning_effort
+        if effort and include_reasoning:
+            kwargs["reasoning_effort"] = effort
+        return client.chat.completions.create(**kwargs)
+
+    def content_of(resp: object) -> str:
+        try:
+            return (resp.choices[0].message.content or "").strip()
+        except (AttributeError, IndexError):
+            return ""
+
+    def truncated(resp: object) -> bool:
+        try:
+            return str(resp.choices[0].finish_reason) == "length"
+        except (AttributeError, IndexError):
+            return False
+
+
+    try:
+        response = call(json_mode)
+    except Exception as exc:  # noqa: BLE001
+        message = str(exc)
+        if "response_format" in message:
+            response = call(False)
+        elif "reasoning_effort" in message or "reasoning" in message:
+            response = None
+            if reasoning_effort == "none" and "expected one of" in message and '"off"' in message:
+                # commandcode-style vocabulary: none is spelled "off"
+                try:
+                    response = call(json_mode, reasoning_override="off")
+                except Exception:  # noqa: BLE001 - model may not support disabling either
+                    response = None
+            if response is None:
+                response = call(json_mode, include_reasoning=False)
+        elif "chat_template_kwargs" in message or "extra_body" in message or "unexpected keyword" in message:
+            response = call(json_mode, disable_reasoning=False)
+        else:
+            raise
+    content = content_of(response)
+    if not content or truncated(response):
+        response = call(False, max(max_tokens or 0, 4096) * 2, disable_reasoning=False)
+        content = content_of(response)
+    if not content:
+        raise ValueError("model returned an empty completion")
+    try:
+        return extract_json_object(content)
+    except json.JSONDecodeError:
+        response = call(False, max(max_tokens or 0, 4096) * 4, disable_reasoning=False)
+        content = content_of(response)
+        if not content:
+            raise ValueError("model returned an empty completion") from None
+        return extract_json_object(content)
+
+
+
 def refine_batch(
     *,
     client: OpenAI,
@@ -114,6 +208,10 @@ def refine_batch(
     language: str,
     glossary_terms: list[str],
     reference_context: str,
+    json_mode: bool = True,
+    disable_thinking: bool = False,
+    max_tokens: int | None = None,
+    reasoning_effort: str | None = None,
 ) -> list[dict]:
     system_prompt = (
         "You refine subtitle text for spoken-word audio. "
@@ -137,26 +235,28 @@ def refine_batch(
     if fallback_model and fallback_model != model:
         models.append(fallback_model)
 
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {
+            "role": "user",
+            "content": (
+                "Refine the subtitle text only.\n"
+                + json.dumps(user_payload, ensure_ascii=False, indent=2)
+            ),
+        },
+    ]
     last_error: Exception | None = None
     for candidate_model in models:
         try:
-            response = client.chat.completions.create(
-                model=candidate_model,
-                temperature=0.0,
-                response_format={"type": "json_object"},
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {
-                        "role": "user",
-                        "content": (
-                            "Refine the subtitle text only.\n"
-                            + json.dumps(user_payload, ensure_ascii=False, indent=2)
-                        ),
-                    },
-                ],
+            payload = chat_json(
+                client,
+                candidate_model,
+                messages,
+                json_mode=json_mode,
+                disable_thinking=disable_thinking,
+                max_tokens=max_tokens,
+                reasoning_effort=reasoning_effort,
             )
-            content = response.choices[0].message.content or ""
-            payload = extract_json_object(content)
             refined = payload.get("cues")
             if not isinstance(refined, list) or len(refined) != len(cues):
                 raise ValueError("model returned an invalid cue list")
@@ -193,7 +293,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--model",
-        default="qwen/qwen3-32b",
+        default="qwen/qwen3.8-27b",
         help="Primary Groq text model for subtitle refinement",
     )
     parser.add_argument(

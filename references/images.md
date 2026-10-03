@@ -20,14 +20,34 @@ Do not reuse a 16:9 YouTube composition unchanged for square covers.
 
 ## Style directions (examples)
 
+- cyanotype blueprint (vintage Prussian-blue engineering print)
+- risograph duotone (grain, misregistration, zine energy)
+- hand-painted Taiwanese cinema billboard (gouache, ornate frame)
 - documentary editorial
 - cinematic philosophical
 - bold modern collage
 - minimal high contrast
 
+Pick from the episode's content (metaphors, guests, stakes) before defaulting to
+generic podcast visuals; research 2–3 references before writing the prompt.
+
+## Generation via Codex (ChatGPT subscription, no API key)
+
+If the local Codex CLI is signed in (`codex login status`), prefer:
+
+```bash
+uv run helpers/generate_codex_image.py \
+  --prompt-file /path/to/edit/cover_prompt.md \
+  --output /path/to/edit/cover.png \
+  --size 1536x1024 --quality medium
+```
+
+Sizes: `1024x1024` (1:1), `1536x1024` (16:9), `1024x1536` (9:16). Quality:
+`low|medium|high` (low for drafts). A typical turn costs ~30k Codex agent tokens
+on top of image-gen usage. Requires `codex login` when the token expires.
 ## Generation priority
 
-1. If the runtime has a built-in image tool (e.g. Codex), use it and save into `edit/`
+1. If this runtime exposes a built-in image tool (omp `xd://generate_image` via the `image` model role; Codex CLI via `generate_codex_image.py`), use it and save into `edit/`
 2. Otherwise local helper:
 
 ```bash

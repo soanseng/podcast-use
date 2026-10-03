@@ -26,9 +26,25 @@ JSON array of segments:
     "end": 18.91,
     "pad_in": 0.05,
     "pad_out": 0.08,
+    "gain_db": -3.0,
+    "fade_in": 0.2,
+    "fade_out": 0.4,
+    "speed": 1.5,
     "reason": "Clean explanation without hesitation"
-  }
+  },
+  {"silence": 1.2, "reason": "beat before the punchline"}
 ]
+```
+
+Audacity-style remove mode (keeps the complement of the listed ranges):
+
+```json
+{
+  "mode": "remove",
+  "segments": [
+    {"source": "episode", "start": 300.0, "end": 312.5, "reason": "dead air"}
+  ]
+}
 ```
 
 | Field | Required | Notes |
@@ -39,6 +55,10 @@ JSON array of segments:
 | `reason` | recommended | Short human rationale |
 | `pad_in` | no | Extra seconds before start |
 | `pad_out` | no | Extra seconds after end |
+| `gain_db` | no | Segment gain in dB, `-60..30` |
+| `fade_in` / `fade_out` | no | Fades in output seconds; both must fit inside the (tempo-adjusted) segment |
+| `speed` | no | Tempo factor `0.25..4.0`; fades are applied after the tempo change |
+| `silence` | no | Standalone item: inserts silence for that many seconds |
 
 ## Rules
 
@@ -46,7 +66,10 @@ JSON array of segments:
 - Align to word timestamps from `edit/transcripts/<source>.json`
 - Prefer slight edge padding over tight word-clipped cuts
 - Global render pad: `render_audio.py --edge-pad-ms 40` (default)
+- `build_subtitles.py` uses the same `--edge-pad-ms` default (40) so subtitle timing matches the render
 - Multi-source takes: `source` must match each audio stem
+- `speed` rescales both the rendered audio and the subtitle timeline; `silence` items advance the timeline
+- Remove mode needs a per-source total duration: render uses the audio file length, validate uses the transcript word span
 
 ## Commands
 
@@ -68,6 +91,13 @@ uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit \
 # Approve + final
 uv run helpers/approve_edl.py --edit-dir /path/to/edit
 uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit
+
+# Remove mode (Audacity-style delete selections) + subtitles from the same EDL
+uv run helpers/validate_edl.py --edit-dir /path/to/edit --edl /path/to/edit/edl.remove.json
+uv run helpers/render_audio.py /path/to/audio.wav --edit-dir /path/to/edit \
+  --edl /path/to/edit/edl.remove.json -o /path/to/edit/trimmed.wav
+uv run helpers/build_subtitles.py /path/to/audio.wav --edit-dir /path/to/edit \
+  --edl /path/to/edit/edl.remove.json --refine-local
 ```
 
 `validate_edl.py` writes `edit/edl_validation.json` with duration estimates, warnings, and largest dropped gaps.

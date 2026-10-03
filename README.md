@@ -212,7 +212,11 @@ uv run helpers/init_status.py --edit-dir "$EDIT"
 uv run helpers/init_glossary.py --edit-dir "$EDIT"
 $EDITOR "$EDIT/glossary.txt"
 
-# 2) transcribe (turbo default; use large-v3 for final accuracy)
+# 2) transcribe (local Taigi ASR, or Groq Whisper)
+# local needs LITELLM_MASTER_KEY in .env; model default breeze-asr-26-taigi
+uv run helpers/transcribe_local.py "$AUDIO" --edit-dir "$EDIT" \
+  --glossary "$EDIT/glossary.txt"
+
 uv run helpers/transcribe_groq.py "$AUDIO" --edit-dir "$EDIT"
 uv run helpers/transcribe_groq.py "$AUDIO" --edit-dir "$EDIT" \
   --model whisper-large-v3 \
@@ -236,7 +240,11 @@ uv run helpers/render_audio.py "$AUDIO" --edit-dir "$EDIT"
 ### Packaging (only after the edit is locked)
 
 ```bash
+# word-level punctuation pass (punctuation-aligned cue breaks):
+uv run helpers/punctuate_words_local.py "$EDIT/transcripts/episode.json"
+
 uv run helpers/build_subtitles.py "$AUDIO" --edit-dir "$EDIT"
+uv run helpers/build_subtitles.py "$AUDIO" --edit-dir "$EDIT" --refine-local
 uv run helpers/build_subtitles.py "$AUDIO" --edit-dir "$EDIT" --refine-groq
 
 uv run helpers/init_deliverables.py "$AUDIO" --edit-dir "$EDIT"
@@ -355,13 +363,16 @@ helpers/                     # executable tools
 | `init_status.py` | Create `STATUS.md` session tracker |
 | `init_glossary.py` | Glossary template |
 | `transcribe_groq.py` | Groq Whisper transcription |
+| `transcribe_local.py` | Taigi ASR via local LiteLLM proxy |
 | `pack_transcripts.py` | Packed markdown + quick stats |
 | `analyze_audio.py` | Silence / filler / retake hints |
 | `validate_edl.py` | Validate cuts + duration report |
 | `approve_edl.py` | Promote draft EDL to approved |
 | `render_audio.py` | Preview/final audio render |
 | `build_subtitles.py` | Output-timeline SRT |
-| `refine_srt_groq.py` | Optional SRT wording refine |
+| `refine_srt_groq.py` | Optional SRT wording refine (Groq) |
+| `refine_srt_local.py` | Optional SRT wording refine (local LiteLLM) |
+| `punctuate_words_local.py` | Word-level punctuation pass for cue breaks |
 | `render_youtube_video.py` | Static-image YouTube MP4 |
 | `init_reels_plan.py` | Reels plan skeleton |
 | `render_reels.py` | Vertical short videos |
