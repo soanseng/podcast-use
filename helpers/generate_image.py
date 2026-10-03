@@ -58,6 +58,10 @@ def build_image_prompt(prompt: str, image_kind: str, aspect_hint: str | None) ->
     elif image_kind == "reel":
         parts.append("Create an attention-grabbing vertical podcast reel visual.")
         parts.append("Prioritize bold subject framing, immediate emotional hook, and mobile-first readability.")
+    parts.append(
+        "Always include at least one person in the scene, rendered consistently with the stated style; "
+        "even cartoon, illustration, or painting styles must depict humans, not empty scenes or objects only."
+    )
     if aspect_hint:
         parts.append(f"Compose for aspect ratio {aspect_hint}.")
     return " ".join(parts)

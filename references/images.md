@@ -6,6 +6,11 @@ Ask before generating any image:
 2. Visual style preference?
 3. If no preference, propose 2–3 directions and recommend one
 
+Standing rule: every cover and reel image includes at least one person in the
+scene. This holds for all styles — cartoon, illustration, painting, collage —
+with people rendered in that style. Never ship an empty-scene or object-only
+visual.
+
 ## Paths
 
 | Asset | Path | Frame |
@@ -88,6 +93,7 @@ Include:
 - episode title / working title
 - host or guest identity if relevant
 - mood and palette
+- human presence (at least one person, styled to match)
 - composition guidance (16:9 or 1:1)
 - typography notes only if text is requested
 - negative prompt (clutter, unreadable type, distorted hands/faces)
